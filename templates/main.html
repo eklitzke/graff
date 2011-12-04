@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block extra_css %}
+    <link rel="stylesheet" type="text/css" href="{{static_url('css/home.css')}}">
+{% end %}
+
 {% block extra_js %}
     <script src="{{static_url('js/main.js')}}"></script>
 {% end %}
@@ -26,7 +30,7 @@ Welcome, {{ user.display }}
 <h2>Recent Uploads</h2>
 <ul>
   {% for photo in recent_photos %}
-  <li><img src="/p/{{photo['photo_id']}}.ts"> <a href="/photo/{{photo['photo_id']}}">{{photo['uploaded']}} {{photo['photo_id']}}</a></li>
+  <li><img src="/p/{{photo['photo_id']}}.ts"> <a href="/photo/{{photo['photo_id']}}">{{photo['ago']}}</a> by Anonymous</li>
   {% end %}
 </ul>
 

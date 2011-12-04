@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import httplib
 import os
+import re
 import traceback
 import PIL.Image
 from PIL.ExifTags import GPSTAGS, TAGS
@@ -15,16 +16,19 @@ except ImportError:
     import json
 
 from graff import db
+from graff import config
 
 class RequestHandler(tornado.web.RequestHandler):
 
     def initialize(self):
         super(RequestHandler, self).initialize()
         self.env = {
+            'config': config,
             'debug': self.settings['debug'],
             'user': None,
             'today': datetime.date.today()
             }
+        self._force_rollback = False
         self._session = None
 
     @property
@@ -35,13 +39,14 @@ class RequestHandler(tornado.web.RequestHandler):
 
     def finish(self, chunk=None):
         if self._session is not None:
-            if self.request.method == 'POST':
-                self.session.commit()
-            else:
+            if self._force_rollback or self.request.method != 'POST':
                 self.session.rollback()
+            else:
+                self.session.commit()
         return super(RequestHandler, self).finish(chunk)
 
     def write_error(self, status_code, **kwargs):
+        self._force_rollback = True
         self.set_header('Content-Type', 'text/html')
         e = {'env': self.env,
              'debug': self.settings['debug'],
@@ -65,7 +70,7 @@ class NotFoundHandler(RequestHandler):
     """Generates an error response with status_code for all requests."""
 
     def prepare(self):
-        raise tornado.web.HTTPError(404)
+        raise tornado.web.HTTPError(httplib.NOT_FOUND)
 
 class MainHandler(RequestHandler):
 
@@ -73,10 +78,53 @@ class MainHandler(RequestHandler):
 
     def get(self):
         recent = []
+        now = datetime.datetime.now()
         for p in db.Photo.most_recent(self.session, 10):
-            recent.append({'uploaded': p.time_created.strftime('%Y-%m-%d %H:%M'), 'photo_id': p.encid})
+            disp = {'photo_id': p.encid}
+            delta = now - p.time_created
+            if delta < datetime.timedelta(seconds=30):
+                disp['ago'] = 'a moment ago'
+            elif delta < datetime.timedelta(seconds=60):
+                disp['ago'] = '1 minute ago'
+            elif delta < datetime.timedelta(seconds=59 * 60):
+                disp['ago'] = '%d minutes ago' % (int(delta.total_seconds() / 60.0),)
+            elif delta < datetime.timedelta(seconds=120 * 60):
+                disp['ago'] = '1 hour ago' % (int(delta.total_seconds() / 60.0),)
+            elif delta < datetime.timedelta(seconds=24 * 60 * 60):
+                disp['ago'] = '%d hours ago' % (int(delta.total_seconds() / 3600.0),)
+            elif delta < datetime.timedelta(seconds=2 * 86400):
+                disp['ago'] = '1 day ago'
+            else:
+                disp['ago'] = '%d days ago' % (int(delta.total_seconds() / 84600.0),)
+            recent.append(disp)
         self.env['recent_photos'] = recent
         self.render('main.html')
+
+NAME_RE = re.compile(r'-_a-zA-Z0-9\$')
+class SignupHandler(RequestHandler):
+
+    path = '/signup'
+
+    def get(self):
+        self.render('signup.html')
+
+    def post(self):
+        name = self.get_argument('name')
+        assert NAME_RE.match(name)
+        assert name.lower() != 'anonymous'
+        password = self.get_argument('password')
+        email = self.get_argument('email', None)
+        location = self.get_argument('location', None)
+
+        user = db.User.create(
+            self.session,
+            name = name,
+            password = password,
+            email = email,
+            location = location
+            )
+        self.session.commit()
+        self.redirect('/user/' + name)
 
 def construct_path(fsid, content_type, makedirs=False):
     p = os.path.join(os.environ.get('TEMPDIR', '/tmp'), 'graff', fsid[:2], fsid[2:4])
@@ -186,8 +234,10 @@ class UploadHandler(RequestHandler):
                 img = img.transpose(PIL.Image.ROTATE_90)
         if 'GPSInfo' in info:
             lat, lng = self.decode_gps(info['GPSInfo'])
+            sensor = True
         else:
             lat, lng = None, None
+            sensor = None
         dt = info.get('DateTime')
         if dt is not None:
             dt = datetime.datetime.strptime(dt, '%Y:%m:%d %H:%M:%S')
@@ -206,7 +256,7 @@ class UploadHandler(RequestHandler):
             f.write(raw_exif)
         self.save_versions(img, pil_type, fspath)
 
-        row = db.Photo.insert(
+        row = db.Photo.create(
             self.session,
             body_hash = body_hash,
             content_type = content_type,
@@ -217,7 +267,8 @@ class UploadHandler(RequestHandler):
             model = model,
             photo_time = dt,
             photo_width = img.size[0],
-            photo_height = img.size[1]
+            photo_height = img.size[1],
+            sensor = sensor
             )
         self.session.commit()
         self.redirect('/photo/' + row.encid)
@@ -229,11 +280,15 @@ class PhotoViewHandler(RequestHandler):
     def get(self, photo_id):
         self.env['photo_id'] = photo_id
         photo = db.Photo.from_encid(self.session, photo_id)
+        self.env['photo'] = photo
         self.env['upload_time'] = photo.time_created.strftime('%Y-%m-%d %l:%M %p')
         self.env['photo_time'] = photo.photo_time.strftime('%Y-%m-%d %l:%M %p') if photo.photo_time else 'unknown'
         if photo.latitude is not None and photo.longitude is not None:
+            self.env['has_coordinates'] = True
+            self.env['sensor'] = 'true' if photo.sensor else 'false'
             self.env['coordinates'] = '%1.4f, %1.4f' % (photo.latitude, photo.longitude)
         else:
+            self.env['has_coordinates'] = False
             self.env['coordinates'] = 'unknown'
         self.render('photo.html')
 
@@ -264,4 +319,6 @@ for v in globals().values():
             handlers.append((v.path, v))
     except TypeError:
         pass
+
+# if no other rules match, use the 404 handler
 handlers.append(('.*', NotFoundHandler))
