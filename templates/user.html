@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block body %}
+<h2>Profile Information</h2>
+<span class="user">{{target_user.name}}</span> has been a user since <strong>{{target_user.time_created.strftime('%Y-%m-%d')}}</strong>.
+<h2>Uploads</h2>
+<ul>
+  {% for photo in target_user.photos %}
+  <li><a href="/photo/{{photo.encid}}"><img src="/p/{{photo.encid}}.m"> uploaded {{ photo.time_created }}</a></li>
+  {% end %}
+</ul>
+{% end %}

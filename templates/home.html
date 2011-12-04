@@ -5,7 +5,7 @@
 {% end %}
 
 {% block extra_js %}
-    <script src="{{static_url('js/main.js')}}"></script>
+    <script src="{{static_url('js/home.js')}}"></script>
 {% end %}
 
 {% block head %}
@@ -15,7 +15,7 @@
 You can start anonymously uploading photos
 immediately, or create an account if you want to get credit for your uploads.
 {% else %}
-Welcome, <strong>{{ user.name }}</strong>.
+Welcome, <span class="user">{{ user.name }}</span>.
 {% end %}
 
 {% end %}
@@ -30,7 +30,14 @@ Welcome, <strong>{{ user.name }}</strong>.
 <h2>Recent Uploads</h2>
 <ul>
   {% for photo in recent_photos %}
-  <li><img src="/p/{{photo['photo_id']}}.ts"> <a href="/photo/{{photo['photo_id']}}">{{photo['ago']}}</a> by Anonymous</li>
+  <li>
+    <a href="/photo/{{photo['photo_id']}}" class="label"> &nbsp;&nbsp; <img src="/p/{{photo['photo_id']}}.ts"> {{photo['ago']}}</a> by
+    {% if photo['user'] %}
+    <span class="user"><a href="/user/{{photo['user'].name}}">{{photo['user'].name}}</a></span>
+    {% else %}
+    Anonymous
+    {% end %}
+    </li>
   {% end %}
 </ul>
 

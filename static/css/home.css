@@ -1,1 +1,4 @@
 input { font-family: 'Open Sans', sans; font-size: 16px; font-weight: 900; color: #FFF3A9; }
+.recent_upload { cursor: pointer; }
+a.label { text-decoration: none; font-weight: bold; }
+a.label:visited { text-decoration: none; font-weight: bold; }

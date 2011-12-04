@@ -12,5 +12,6 @@ CREATE TABLE photo (
   photo_time DATETIME,
   sensor BOOLEAN,
   time_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  user_id INTEGER,
   PRIMARY KEY (id)
 ) Engine=InnoDB;

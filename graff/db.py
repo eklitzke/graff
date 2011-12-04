@@ -1,7 +1,7 @@
 import hashlib
-from sqlalchemy import create_engine, Column
+from sqlalchemy import create_engine, Column, ForeignKey
 from sqlalchemy.types import Integer, String, Text, Float, DateTime, Boolean
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship, backref
 from sqlalchemy.ext.declarative import declarative_base
 
 from graff import config
@@ -59,6 +59,10 @@ class Photo(Base):
     photo_width = Column(Integer, nullable=False)
     sensor = Column(Boolean)
     time_created = Column(DateTime, nullable=False)
+    user_id = Column(Integer, ForeignKey('user.id'))
+
+    user = relationship('User', backref=backref('photos', order_by=id))
+
 
 class User(Base):
     __tablename__ = 'user'
@@ -91,3 +95,7 @@ class User(Base):
         if hashlib.sha1(str(row_hash[:8]) + password.encode('ascii')).digest() == row_hash[8:]:
             return row
         return None
+
+    @classmethod
+    def by_name(cls, session, name):
+        return session.query(cls).filter(cls.name == name).first()

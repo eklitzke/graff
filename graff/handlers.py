@@ -66,16 +66,16 @@ class RequestHandler(tornado.web.RequestHandler):
 
         user_id = self.get_secure_cookie('s')
         if user_id:
-            user = db.User.from_encid(self.session, user_id)
+            self.user = db.User.from_encid(self.session, user_id)
         else:
-            user = None
+            self.user = None
 
         self.env = {
             'config': config,
             'debug': self.settings['debug'],
             'flash': self.flash,
             'is_error': False,
-            'user': user,
+            'user': self.user,
             'today': datetime.date.today()
             }
 
@@ -125,7 +125,7 @@ class NotFoundHandler(RequestHandler):
     def prepare(self):
         raise tornado.web.HTTPError(httplib.NOT_FOUND)
 
-class MainHandler(RequestHandler):
+class HomeHandler(RequestHandler):
 
     path = '/'
 
@@ -133,7 +133,7 @@ class MainHandler(RequestHandler):
         recent = []
         now = datetime.datetime.now()
         for p in db.Photo.most_recent(self.session, 10):
-            disp = {'photo_id': p.encid}
+            disp = {'photo_id': p.encid, 'user': p.user}
             delta = now - p.time_created
             if delta < datetime.timedelta(seconds=30):
                 disp['ago'] = 'a moment ago'
@@ -151,9 +151,9 @@ class MainHandler(RequestHandler):
                 disp['ago'] = '%d days ago' % (int(delta.total_seconds() / 84600.0),)
             recent.append(disp)
         self.env['recent_photos'] = recent
-        self.render('main.html')
+        self.render('home.html')
 
-NAME_RE = re.compile(r'[-_a-zA-Z0-9\$]*$')
+NAME_RE = re.compile(r'[-_~a-zA-Z0-9@!\$]*$')
 class SignupHandler(RequestHandler):
 
     path = '/signup'
@@ -163,8 +163,19 @@ class SignupHandler(RequestHandler):
 
     def post(self):
         name = self.get_argument('name')
-        assert NAME_RE.match(name)
-        assert name.lower() != 'anonymous'
+        if not NAME_RE.match(name):
+            self.flash.error.append('Username contains characters that are not allowed')
+            self.redirect('/signup')
+            return
+        if name.lower() == 'anonymous':
+            self.flash.error.append('That username is reserved.')
+            self.redirect('/signup')
+            return
+        if len(name) > 32:
+            self.flash.error.append('Username is too long; restrict to at most 32 characters.')
+            self.redirect('/signup')
+            return
+
         password = self.get_argument('password')
         email = self.get_argument('email', None)
         location = self.get_argument('location', None)
@@ -352,7 +363,8 @@ class UploadHandler(RequestHandler):
             photo_time = dt,
             photo_width = img.size[0],
             photo_height = img.size[1],
-            sensor = sensor
+            sensor = sensor,
+            user_id = self.user.id if self.user else None
             )
         self.session.commit()
         self.redirect('/photo/' + row.encid)
@@ -365,6 +377,10 @@ class PhotoViewHandler(RequestHandler):
         self.env['photo_id'] = photo_id
         photo = db.Photo.from_encid(self.session, photo_id)
         self.env['photo'] = photo
+        if self.user and photo.user.id == self.user.id:
+            self.env['own_photo'] = True
+        else:
+            self.env['own_photo'] = False
         self.env['upload_time'] = photo.time_created.strftime('%Y-%m-%d %l:%M %p')
         self.env['photo_time'] = photo.photo_time.strftime('%Y-%m-%d %l:%M %p') if photo.photo_time else 'unknown'
         if photo.latitude is not None and photo.longitude is not None:
@@ -395,6 +411,18 @@ class PhotoHandler(RequestHandler):
         self.set_header('Content-Length', st.st_size)
         with open(fspath, 'rb') as f:
             self.write(f.read())
+
+class UserHandler(RequestHandler):
+
+    path = '/user/(.*)'
+
+    def get(self, user_name):
+        target_user = db.User.by_name(self.session, user_name)
+        if target_user is None:
+            raise HTTPError(httplib.NOT_FOUND)
+        self.env['target_user'] = target_user
+        self.render('user.html')
+
 
 handlers = []
 for v in globals().values():

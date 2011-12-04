@@ -12,10 +12,14 @@ em { font-weight: 900; font-style: italic; }
 p { margin-top: 0.6em; }
 .graff_img { cursor: pointer; }
 .red { color: #FB3F31 !important; }
+.user { color: #ebc8ff !important; font-weight: bold; text-decoration: none; }
 label { font-weight: 900; }
 strong { font-weight: 900; }
-a { color: #ffb99a; }
+a:link { color: #ffb99a; }
 a:visited { color: #bbdaaf; }
+
+.user > a { text-decoration: none; color: #ebc8ff; }
+#nav a { text-decoration: none; }
 
 .flash_info { color: #abffea; font-weight: bold; }
 .flash_error { color: #FB3F31; font-weight: bold; }

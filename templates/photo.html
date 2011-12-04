@@ -15,7 +15,13 @@
 <div id="photo_box">
   <img src="/p/{{photo_id}}.l" class="graff_img">
 </div>
-<label>Uploader:</label> Anonymous <br>
+<label>Uploader:</label>
+{% if photo.user %}
+<span class="user"><a href="/user/{{photo.user.name}}">{{photo.user.name}}</a></span>
+{% else %}
+Anonymous
+{% end %}
+<br>
 <label>Time Uploaded:</label> {{ upload_time }} <br>
 <label>Time Taken:</label> {{ photo_time }} <br>
 

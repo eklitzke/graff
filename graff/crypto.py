@@ -4,7 +4,12 @@ import os
 import struct
 from Crypto.Cipher import DES3
 
-encid_secret = os.environ.get('GRAFF_ENCID_SECRET', '?' * 16)
+from graff import config
+
+_default_secret = '?' * 16
+encid_secret = config.get('crypto_secret', _default_secret)
+if encid_secret != _default_secret:
+    encid_secret = encid_secret.decode('hex')
 
 HASH_SIZE = IV_SIZE = BASE64_BLOCK_SIZE = 8
 HALF_HASH_SIZE = 4
