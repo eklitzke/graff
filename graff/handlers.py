@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import httplib
 import os
+import traceback
 import PIL.Image
 from PIL.ExifTags import GPSTAGS, TAGS
 import tornado.template
@@ -19,7 +20,11 @@ class RequestHandler(tornado.web.RequestHandler):
 
     def initialize(self):
         super(RequestHandler, self).initialize()
-        self.env = {}
+        self.env = {
+            'debug': self.settings['debug'],
+            'user': None,
+            'today': datetime.date.today()
+            }
         self._session = None
 
     @property
@@ -36,8 +41,31 @@ class RequestHandler(tornado.web.RequestHandler):
                 self.session.rollback()
         return super(RequestHandler, self).finish(chunk)
 
+    def write_error(self, status_code, **kwargs):
+        self.set_header('Content-Type', 'text/html')
+        e = {'env': self.env,
+             'debug': self.settings['debug'],
+             'is_error': False,
+             'user': self.env['user'],
+             'title': httplib.responses[status_code],
+             }
+        if 500 <= status_code <= 599:
+            e['is_error'] = True
+            tb = []
+            for line in traceback.format_exception(*kwargs['exc_info']):
+                tb.append(line)
+            e['traceback'] = '\n'.join(tb)
+        self.write(self.render_string("error.html", **e))
+        return self.finish()
+
     def render(self, name):
         return super(RequestHandler, self).render(name, **self.env)
+
+class NotFoundHandler(RequestHandler):
+    """Generates an error response with status_code for all requests."""
+
+    def prepare(self):
+        raise tornado.web.HTTPError(404)
 
 class MainHandler(RequestHandler):
 
@@ -236,3 +264,4 @@ for v in globals().values():
             handlers.append((v.path, v))
     except TypeError:
         pass
+handlers.append(('.*', NotFoundHandler))

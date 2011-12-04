@@ -12,6 +12,15 @@
   </head>
   <body>
     <div id="container">
+      {% block nav %}
+      <div id="nav">
+        {% if not user %}
+        <a href="/signup">Login/Signup</a>
+        {% else %}
+        <a href="/logout">Logout</a>
+        {% end %}
+      </div>
+      {% end %}
       <div id="hd">
         {% block head %}
         <h1 id="title">Graff Spotting</h1>
@@ -20,6 +29,11 @@
       <div id="bd">
         {% block body %} {% end %}
       </div> <!-- #bd -->
+      {% block footer %}
+      <div id="ft">
+        Send feedback to evan@eklitzke.org
+      </div> <!-- #ft -->
+      {% end %}
     </div> <!-- #container -->
   </body>
 </html>

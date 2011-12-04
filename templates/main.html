@@ -7,7 +7,13 @@
 {% block head %}
 <h1 id="title">Graff Spotting</h1>
 
-Welcome to <em>Graff Spotting</em>. Upload a photo, why don't you?
+{% if not user %}
+You can start anonymously uploading photos
+immediately, or create an account if you want to get credit for your uploads.
+{% else %}
+Welcome, {{ user.display }}
+{% end %}
+
 {% end %}
 
 {% block body %}
@@ -41,8 +47,9 @@ your camera supports geolocation data (e.g. if you took a photo from your
 iPhone/Android/mobile phone), the picture can be automatically tagged with
 location data.
         
+<!--
 <p>
-      
 One day there might be an Android or iPhone app. No promises, though.
+-->
 
 {% end %}

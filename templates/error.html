@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block nav %}{% end %}
+
+{% block head %}
+<h1 id="title" class="red">{{title}}</h1>
+{% end %}
+
+{% block body %}
+  {% if is_error %}
+    {% if debug %}
+      <pre>
+        {{ traceback }}
+      </pre>
+    {% else %}
+      Please email <tt>evan@eklitzke.org</tt> to notify him of the issue.
+    {% end %}
+  {% else %}
+    If you think you've reached this page in error, please email <tt>evan@eklitzke.org</tt> to notify him of the issue.
+  {% end %}
+{% end %}
+
+{% block footer %}{% end %}
