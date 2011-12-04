@@ -4,7 +4,7 @@ input { font-family: 'Open Sans', sans; font-size: 16px; font-weight: 900; color
 body { margin: 2em 1em; text-align: center; }
 #container { margin-left: auto; margin-right: auto; text-align: left; width: 950px; }
 #ft { margin-top: 1em; font-size: 11px; color: #bcb47b; }
-#nav { float: right; }
+#nav { font-weight: 900; float: right; }
 #title { cursor: pointer; }
 h1 { font-size: 28px; font-weight: 900; color: #86FFB9; margin-bottom: 0.5em; }
 h2 { font-size: 20px; font-weight: 900; color: #86EAFF; margin-top: 1em; }
@@ -16,3 +16,6 @@ label { font-weight: 900; }
 strong { font-weight: 900; }
 a { color: #ffb99a; }
 a:visited { color: #bbdaaf; }
+
+.flash_info { color: #abffea; font-weight: bold; }
+.flash_error { color: #FB3F31; font-weight: bold; }

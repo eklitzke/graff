@@ -72,9 +72,13 @@ class User(Base):
 
     @classmethod
     def create(cls, session, **kwargs):
+        if session.query(cls).filter(cls.name == kwargs['name']).first() is not None:
+            return 'That username has already been taken'
+        if kwargs['email'] and session.query(cls).filter(cls.email == kwargs['email']).first() is not None:
+            return 'That email has already been registered'
         with open('/dev/random', 'rb') as devrandom:
             salt = devrandom.read(8)
-        hashval = hashlib.sha1(salt + kwargs.pop('password')).digest()
+        hashval = hashlib.sha1(salt + kwargs.pop('password').encode('ascii')).digest()
         kwargs['pw_hash'] = (salt + hashval).encode('hex')
         return super(User, cls).create(session, **kwargs)
 
@@ -84,6 +88,6 @@ class User(Base):
         if row is None:
             return None
         row_hash = row.pw_hash.decode('hex')
-        if hashlib.sha1(row_hash[:8] + password).digest() == row_hash[8:]:
+        if hashlib.sha1(str(row_hash[:8]) + password.encode('ascii')).digest() == row_hash[8:]:
             return row
         return None

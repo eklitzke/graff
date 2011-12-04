@@ -21,6 +21,9 @@
         {% end %}
       </div>
       {% end %}
+      {% if not is_error %}
+        {% raw flash.render_html() %}
+      {% end %}
       <div id="hd">
         {% block head %}
         <h1 id="title">Graff Spotting</h1>

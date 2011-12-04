@@ -18,18 +18,66 @@ except ImportError:
 from graff import db
 from graff import config
 
+class Flash(object):
+
+    def __init__(self, info=None, error=None):
+        self.info = info or []
+        self.error = error or []
+
+    @classmethod
+    def load(cls, val):
+        v = json.loads(val)
+        return cls(v['info'], v['error'])
+
+    def dump(self):
+        return json.dumps({'info': self.info, 'error': self.error})
+
+    @property
+    def empty(self):
+        return not bool(self.info or self.error)
+
+    def render_html(self):
+        def render_bit(css_class, message):
+            return '<div class="%s">%s</div>' % (tornado.escape.xhtml_escape(css_class), tornado.escape.xhtml_escape(message))
+        divs = []
+        for i in self.info:
+            divs.append(render_bit('flash_info', i))
+        for e in self.error:
+            divs.append(render_bit('flash_error', e))
+        html = ''.join(divs)
+        self.clear()
+        return html
+
+    def clear(self):
+        del self.info[:]
+        del self.error[:]
+
 class RequestHandler(tornado.web.RequestHandler):
 
     def initialize(self):
         super(RequestHandler, self).initialize()
+        flash_cookie = self.get_cookie('flash')
+        if flash_cookie:
+            self.flash = Flash.load(tornado.escape.url_unescape(flash_cookie))
+        else:
+            self.flash = Flash()
+        self._force_rollback = False
+        self._session = None
+
+        user_id = self.get_secure_cookie('s')
+        if user_id:
+            user = db.User.from_encid(self.session, user_id)
+        else:
+            user = None
+
         self.env = {
             'config': config,
             'debug': self.settings['debug'],
-            'user': None,
+            'flash': self.flash,
+            'is_error': False,
+            'user': user,
             'today': datetime.date.today()
             }
-        self._force_rollback = False
-        self._session = None
 
     @property
     def session(self):
@@ -43,6 +91,10 @@ class RequestHandler(tornado.web.RequestHandler):
                 self.session.rollback()
             else:
                 self.session.commit()
+        if not self.flash.empty:
+            self.set_cookie('flash', tornado.escape.url_escape(self.flash.dump()))
+        elif 'flash' in self.request.cookies:
+            self.clear_cookie('flash')
         return super(RequestHandler, self).finish(chunk)
 
     def write_error(self, status_code, **kwargs):
@@ -50,6 +102,7 @@ class RequestHandler(tornado.web.RequestHandler):
         self.set_header('Content-Type', 'text/html')
         e = {'env': self.env,
              'debug': self.settings['debug'],
+             'flash': self.flash,
              'is_error': False,
              'user': self.env['user'],
              'title': httplib.responses[status_code],
@@ -84,12 +137,12 @@ class MainHandler(RequestHandler):
             delta = now - p.time_created
             if delta < datetime.timedelta(seconds=30):
                 disp['ago'] = 'a moment ago'
-            elif delta < datetime.timedelta(seconds=60):
+            elif delta < datetime.timedelta(seconds=120):
                 disp['ago'] = '1 minute ago'
             elif delta < datetime.timedelta(seconds=59 * 60):
                 disp['ago'] = '%d minutes ago' % (int(delta.total_seconds() / 60.0),)
             elif delta < datetime.timedelta(seconds=120 * 60):
-                disp['ago'] = '1 hour ago' % (int(delta.total_seconds() / 60.0),)
+                disp['ago'] = '1 hour ago'
             elif delta < datetime.timedelta(seconds=24 * 60 * 60):
                 disp['ago'] = '%d hours ago' % (int(delta.total_seconds() / 3600.0),)
             elif delta < datetime.timedelta(seconds=2 * 86400):
@@ -100,7 +153,7 @@ class MainHandler(RequestHandler):
         self.env['recent_photos'] = recent
         self.render('main.html')
 
-NAME_RE = re.compile(r'-_a-zA-Z0-9\$')
+NAME_RE = re.compile(r'[-_a-zA-Z0-9\$]*$')
 class SignupHandler(RequestHandler):
 
     path = '/signup'
@@ -123,8 +176,39 @@ class SignupHandler(RequestHandler):
             email = email,
             location = location
             )
-        self.session.commit()
-        self.redirect('/user/' + name)
+        if isinstance(user, basestring):
+            self.flash.error.append(user)
+            self.redirect('/signup')
+        else:
+            self.session.commit()
+            self.set_secure_cookie('s', user.encid)
+            self.redirect('/user/' + name)
+
+class LoginHandler(RequestHandler):
+
+    path = '/login'
+
+    def post(self):
+        name = self.get_argument('name')
+        password = self.get_argument('password')
+        user = db.User.authenticate(self.session, name, password)
+        if user:
+            self.set_secure_cookie('s', user.encid)
+            self.redirect('/')
+        else:
+            self.flash.error.append('Failed to login with that username/password')
+            self.redirect('/signup')
+
+class LogoutHandler(RequestHandler):
+
+    path = '/logout'
+
+    def get(self):
+        self.clear_cookie('s')
+        self.flash.info.append('Come back soon!')
+        self.redirect('/')
+
+    post = get
 
 def construct_path(fsid, content_type, makedirs=False):
     p = os.path.join(os.environ.get('TEMPDIR', '/tmp'), 'graff', fsid[:2], fsid[2:4])

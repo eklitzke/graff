@@ -6,6 +6,6 @@ CREATE TABLE user (
   location VARCHAR(128),
   time_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY (`name`),
-  KEY (email)
+  UNIQUE KEY (`name`),
+  UNIQUE KEY (email)
 ) Engine=InnoDB;
