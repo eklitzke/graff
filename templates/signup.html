@@ -8,6 +8,7 @@
 <div id="signup_box">
   <h2>Signup</h2>
   <form method="POST" action="/signup">
+    {% raw xsrf_form_html() %}
     <label for="signup_username">Username*</label> <br>
     <input id="signup_username" type="text" name="name"> <br>
     <label for="signup_password">Password*</label> <br>
@@ -28,6 +29,7 @@
 <div id="login_box">
   <h2>Login</h2>
   <form method="POST" action="/login">
+    {% raw xsrf_form_html() %}
     <label for="login_username">Username</label> <br>
     <input id="login_uername" type="text" name="name"> <br>
     <label for="login_password">Password</label> <br>

@@ -5,7 +5,23 @@
 {% end %}
 
 {% block extra_js %}
-    <script src="{{static_url('js/home.js')}}"></script>
+    <script type="text/javascript" src="//maps.googleapis.com/maps/api/js?key={{gmaps_api_key}}&sensor=true"></script>
+    <script type="text/javascript" src="{{static_url('js/home.js')}}"></script>
+
+<script type="text/javascript">
+{% if center %}
+var markers = [
+{% for l in latlng %}
+  new google.maps.LatLng({{l['lat']}}, {{l['lng']}}),
+{% end %}
+];
+var center = new google.maps.LatLng({{center['lat']}}, {{center['lng']}});
+var bounds = new google.maps.LatLngBounds(
+  new google.maps.LatLng({{sw_point['lat']}}, {{sw_point['lng']}}),
+  new google.maps.LatLng({{ne_point['lat']}}, {{ne_point['lng']}}));
+{% end %}
+</script>
+
 {% end %}
 
 {% block head %}
@@ -15,7 +31,7 @@
 You can start anonymously uploading photos
 immediately, or create an account if you want to get credit for your uploads.
 {% else %}
-Welcome, <span class="user">{{ user.name }}</span>.
+Welcome, <span class="user">{{ user.name }}</span>. Perhaps you'd like to upload some new photos?
 {% end %}
 
 {% end %}
@@ -28,18 +44,24 @@ Welcome, <span class="user">{{ user.name }}</span>.
 </form>
 
 <h2>Recent Uploads</h2>
-<ul>
-  {% for photo in recent_photos %}
-  <li>
-    <a href="/photo/{{photo['photo_id']}}" class="label"> &nbsp;&nbsp; <img src="/p/{{photo['photo_id']}}.ts"> {{photo['ago']}}</a> by
-    {% if photo['user'] %}
-    <span class="user"><a href="/user/{{photo['user'].name}}">{{photo['user'].name}}</a></span>
-    {% else %}
-    Anonymous
-    {% end %}
-    </li>
-  {% end %}
-</ul>
+<div id="uploads">
+  <div id="uploads_box">
+    <ul>
+      {% for photo in recent_photos %}
+      <li>
+        <a href="/photo/{{photo.encid}}" class="label"> &nbsp;&nbsp; <img src="/p/{{photo.encid}}.ts"> {{photo.time_ago}}</a> by
+        {% if photo.user is not None %}
+        <span class="user"><a href="/user/{{photo.user.name}}">{{photo.user.name}}</a></span>
+        {% else %}
+        Anonymous
+        {% end %}
+      </li>
+      {% end %}
+    </ul>
+  </div>
+  <div id="uploads_map"></div>
+  <div class="clearboth"></div>
+</div>
 
 <h2>About</h2>
 

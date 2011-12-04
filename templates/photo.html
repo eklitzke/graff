@@ -6,12 +6,16 @@
 
 {% block extra_js %}
   {% if has_coordinates %}
-    <script type="text/javascript" src="//maps.googleapis.com/maps/api/js?key={{config.get('gmaps_api_key', 'AIzaSyCTd_7j6ZeXATLOfTvpAqaqCkxM0zFP5Oc')}}&sensor={{sensor}}"></script>
+    <script type="text/javascript" src="//maps.googleapis.com/maps/api/js?key={{gmaps_api_key}}&sensor={{sensor}}"></script>
     <script type="text/javascript" src="{{static_url('js/photo.js')}}"></script>
   {% end %}
 {% end %}
 
 {% block body %}
+{% if own_photo %}
+  This is your photo. You can edit the attributes below.
+{% end %}
+
 <div id="photo_box">
   <img src="/p/{{photo_id}}.l" class="graff_img">
 </div>
@@ -24,6 +28,11 @@ Anonymous
 <br>
 <label>Time Uploaded:</label> {{ upload_time }} <br>
 <label>Time Taken:</label> {{ photo_time }} <br>
+
+<label for="description_area">Description:</label><br>
+{% if own_photo %}
+<textarea id="description_area" cols=80 rows=4></textarea>
+{% end %}
 
 <br>
 {% if has_coordinates %}

@@ -74,6 +74,7 @@ class RequestHandler(tornado.web.RequestHandler):
             'config': config,
             'debug': self.settings['debug'],
             'flash': self.flash,
+            'gmaps_api_key': config.get('gmaps_api_key', 'AIzaSyCTd_7j6ZeXATLOfTvpAqaqCkxM0zFP5Oc'),
             'is_error': False,
             'user': self.user,
             'today': datetime.date.today()
@@ -131,26 +132,19 @@ class HomeHandler(RequestHandler):
 
     def get(self):
         recent = []
-        now = datetime.datetime.now()
-        for p in db.Photo.most_recent(self.session, 10):
-            disp = {'photo_id': p.encid, 'user': p.user}
-            delta = now - p.time_created
-            if delta < datetime.timedelta(seconds=30):
-                disp['ago'] = 'a moment ago'
-            elif delta < datetime.timedelta(seconds=120):
-                disp['ago'] = '1 minute ago'
-            elif delta < datetime.timedelta(seconds=59 * 60):
-                disp['ago'] = '%d minutes ago' % (int(delta.total_seconds() / 60.0),)
-            elif delta < datetime.timedelta(seconds=120 * 60):
-                disp['ago'] = '1 hour ago'
-            elif delta < datetime.timedelta(seconds=24 * 60 * 60):
-                disp['ago'] = '%d hours ago' % (int(delta.total_seconds() / 3600.0),)
-            elif delta < datetime.timedelta(seconds=2 * 86400):
-                disp['ago'] = '1 day ago'
-            else:
-                disp['ago'] = '%d days ago' % (int(delta.total_seconds() / 84600.0),)
-            recent.append(disp)
-        self.env['recent_photos'] = recent
+        self.env['recent_photos'] = list(db.Photo.most_recent(self.session, 10))
+        v = lambda x: x is not None
+        self.env['latlng'] = [{'lat': p.latitude, 'lng': p.longitude} for p in self.env['recent_photos'] if v(p.latitude) and v(p.longitude)]
+        if self.env['latlng']:
+            minlat = min(x['lat'] for x in self.env['latlng'])
+            maxlat = max(x['lat'] for x in self.env['latlng'])
+            minlng = min(x['lng'] for x in self.env['latlng'])
+            maxlng = max(x['lng'] for x in self.env['latlng'])
+            self.env['center'] = {'lat': 0.5 * (minlat + maxlat), 'lng': 0.5 * (minlng + maxlng)}
+            self.env['sw_point'] = {'lat': minlat, 'lng': minlng}
+            self.env['ne_point'] = {'lat': maxlat, 'lng': maxlng}
+        else:
+            self.env['center'] = None
         self.render('home.html')
 
 NAME_RE = re.compile(r'[-_~a-zA-Z0-9@!\$]*$')

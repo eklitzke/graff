@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 from sqlalchemy import create_engine, Column, ForeignKey
 from sqlalchemy.types import Integer, String, Text, Float, DateTime, Boolean
@@ -63,6 +64,23 @@ class Photo(Base):
 
     user = relationship('User', backref=backref('photos', order_by=id))
 
+    @property
+    def time_ago(self):
+        delta = datetime.datetime.now() - self.time_created
+        if delta < datetime.timedelta(seconds=30):
+            return 'a moment ago'
+        elif delta < datetime.timedelta(seconds=120):
+            return '1 minute ago'
+        elif delta < datetime.timedelta(seconds=59 * 60):
+            return '%d minutes ago' % (int(delta.total_seconds() / 60.0),)
+        elif delta < datetime.timedelta(seconds=120 * 60):
+            return '1 hour ago'
+        elif delta < datetime.timedelta(seconds=24 * 60 * 60):
+            return '%d hours ago' % (int(delta.total_seconds() / 3600.0),)
+        elif delta < datetime.timedelta(seconds=2 * 86400):
+            return '1 day ago'
+        else:
+            return '%d days ago' % (int(delta.total_seconds() / 84600.0),)
 
 class User(Base):
     __tablename__ = 'user'
