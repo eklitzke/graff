@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+    <link rel="stylesheet" type="text/css" href="{{static_url('css/photo.css')}}">
+{% end %}
+
+{% block body %}
+<div id="photo_box">
+  <img src="/p/{{photo_id}}.l" class="graff_img">
+</div>
+<label>Time Uploaded:</label> {{ upload_time }} <br>
+<label>Time Taken:</label> {{ photo_time }} <br>
+<label>Coordinates:</label> {{ coordinates }}
+{% end %}

@@ -1,0 +1,14 @@
+html { font-family: 'Open Sans', sans; font-size: 16px; background-image: url('/static/images/static.png'); color: #FFF3BD; /*font-weight: 600;*/ }
+button { font-family: 'Open Sans', sans; font-size: 16px; font-weight: 900; color: #FFF3BD; }
+input { font-family: 'Open Sans', sans; font-size: 16px; font-weight: 900; color: #FFF3BD; }
+body { margin: 2em 1em; text-align: center; }
+#container { margin-left: auto; margin-right: auto; text-align: left; width: 950px; }
+#title { cursor: pointer; }
+h1 { font-size: 28px; font-weight: 900; color: #86FFB9; margin-bottom: 0.5em; }
+h2 { font-size: 20px; font-weight: 900; color: #86EAFF; margin-top: 1em; }
+em { font-weight: 900; font-style: italic; }
+p { margin-top: 0.6em; }
+.graff_img { cursor: pointer; }
+label { font-weight: 900; }
+a { color: #ffd09a; }
+a:visited { color: #bbdaaf; }

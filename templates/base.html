@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssreset/cssreset-min.css">
+    <link rel="stylesheet" type="text/css" href="{{static_url('css/base.css')}}" />
+    <link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Open+Sans">
+    {% block extra_css %}{% end %}
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="{{static_url('js/base.js')}}"></script>
+    {% block extra_js %}{% end %}
+    <link rel="icon" type="image/png" href="{{static_url('favicon.png')}}">
+  </head>
+  <body>
+    <div id="container">
+      <div id="hd">
+        {% block head %}
+        <h1 id="title">Graff Spotting</h1>
+        {% end %}
+      </div> <!-- #hd -->
+      <div id="bd">
+        {% block body %} {% end %}
+      </div> <!-- #bd -->
+    </div> <!-- #container -->
+  </body>
+</html>
+
