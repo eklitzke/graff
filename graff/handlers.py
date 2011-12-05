@@ -31,15 +31,17 @@ class RequestHandler(tornado.web.RequestHandler):
             if detect_mobile(self.request.headers.get('User-Agent')):
                 self.set_cookie('m', '1')
                 mobile = True
-                if host in ('grafspotting.com', 'www.grafspotting.com'):
-                    self.redirect_host('m.grafspotting.com')
+                if host in ('graffspotting.com', 'www.graffspotting.com'):
+                    self.redirect_host('m.graffspotting.com')
             else:
                 mobile = False
                 self.set_cookie('m', '0')
         else:
             mobile = self.get_cookie('m') == '1'
-            if host == 'www.grafspotting.com':
-                self.redirect_host('grafspotting.com')
+            if mobile and host in ('graffspotting.com', 'www.graffspotting.com'):
+                self.redirect_host('m.graffspotting.com')
+            if host == 'www.graffspotting.com':
+                self.redirect_host('graffspotting.com')
 
         flash_cookie = self.get_cookie('flash')
         if flash_cookie:
