@@ -9,13 +9,12 @@
     <script type="text/javascript" src="{{static_url('js/home.js')}}"></script>
 
 <script type="text/javascript">
-{% if center %}
+{% if latlng %}
 var markers = [
 {% for l in latlng %}
   new google.maps.LatLng({{l['lat']}}, {{l['lng']}}),
 {% end %}
 ];
-var center = new google.maps.LatLng({{center['lat']}}, {{center['lng']}});
 var bounds = new google.maps.LatLngBounds(
   new google.maps.LatLng({{sw_point['lat']}}, {{sw_point['lng']}}),
   new google.maps.LatLng({{ne_point['lat']}}, {{ne_point['lng']}}));

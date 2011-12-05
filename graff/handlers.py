@@ -140,11 +140,8 @@ class HomeHandler(RequestHandler):
             maxlat = max(x['lat'] for x in self.env['latlng'])
             minlng = min(x['lng'] for x in self.env['latlng'])
             maxlng = max(x['lng'] for x in self.env['latlng'])
-            self.env['center'] = {'lat': 0.5 * (minlat + maxlat), 'lng': 0.5 * (minlng + maxlng)}
             self.env['sw_point'] = {'lat': minlat, 'lng': minlng}
             self.env['ne_point'] = {'lat': maxlat, 'lng': maxlng}
-        else:
-            self.env['center'] = None
         self.render('home.html')
 
 NAME_RE = re.compile(r'[-_~a-zA-Z0-9@!\$]*$')
@@ -371,7 +368,7 @@ class PhotoViewHandler(RequestHandler):
         self.env['photo_id'] = photo_id
         photo = db.Photo.from_encid(self.session, photo_id)
         self.env['photo'] = photo
-        if self.user and photo.user.id == self.user.id:
+        if self.user and photo.user and photo.user.id == self.user.id:
             self.env['own_photo'] = True
         else:
             self.env['own_photo'] = False
@@ -399,7 +396,16 @@ class PhotoHandler(RequestHandler):
 
         photo = db.Photo.from_encid(self.session, encid)
         self.set_header('Content-Type', photo.content_type)
-        #self.set_header('Last-Modified', photo.photo_time or p
+
+        if photo.photo_time:
+            # We don't actually know the camera's timezone (at least not with a
+            # Nexus S), so just guess UTC. We'll be off by at most 12 hours,
+            # anyway.
+            self.set_header('Last-Modified', photo.photo_time.strftime('%a, %d %b %Y %H:%M:%S UTC'))
+        else:
+            # XXX: this is lazy, we ought to be able to get the actual timezone
+            self.set_header('Last-Modified', photo.time_created.strftime('%a, %d %b %Y %H:%M:%S UTC'))
+
         fspath = construct_path(photo.fsid, photo.content_type) + '.' + size
         st = os.stat(fspath)
         self.set_header('Content-Length', st.st_size)

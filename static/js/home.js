@@ -2,9 +2,9 @@ $(document).ready(function () {
     $('#imgfield').change(function () {
         $('#imgform').submit();
     });
-    if (center) {
+    if (markers) {
         var mapOptions = {
-            center: center,
+            center: bounds.getCenter(),
             mapTypeId: google.maps.MapTypeId.ROADMAP
         };
         var map = new google.maps.Map(document.getElementById("uploads_map"), mapOptions);
