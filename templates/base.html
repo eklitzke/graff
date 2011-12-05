@@ -27,8 +27,9 @@
       {% end %}
       <div id="hd">
         {% block head %}
-        <h1 id="title">Graff Spotting</h1>
+        <a href="/"><img src="{{static_url('images/grafflogo.png')}}"></a>
         {% end %}
+        {% block head_text %}{% end %}
       </div> <!-- #hd -->
       <div id="bd">
         {% block body %} {% end %}
