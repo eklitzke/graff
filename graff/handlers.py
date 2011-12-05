@@ -7,53 +7,14 @@ import re
 import traceback
 import PIL.Image
 from PIL.ExifTags import GPSTAGS, TAGS
-from tornado.escape import url_escape, url_unescape, xhtml_escape
+from tornado.escape import url_escape, url_unescape
 import tornado.template
 import tornado.web
 from tornado.web import RequestHandler
-from mobile.sniffer.detect import detect_mobile_browser
-try:
-    import simplejson as json
-except ImportError:
-    import json
 
 from graff import db
 from graff import config
-from graff.util import inet_aton
-
-class Flash(object):
-
-    def __init__(self, info=None, error=None):
-        self.info = info or []
-        self.error = error or []
-
-    @classmethod
-    def load(cls, val):
-        v = json.loads(val)
-        return cls(v['info'], v['error'])
-
-    def dump(self):
-        return json.dumps({'info': self.info, 'error': self.error})
-
-    @property
-    def empty(self):
-        return not bool(self.info or self.error)
-
-    def render_html(self):
-        def render_bit(css_class, message):
-            return '<div class="%s">%s</div>' % (xhtml_escape(css_class), xhtml_escape(message))
-        divs = []
-        for i in self.info:
-            divs.append(render_bit('flash_info', i))
-        for e in self.error:
-            divs.append(render_bit('flash_error', e))
-        html = ''.join(divs)
-        self.clear()
-        return html
-
-    def clear(self):
-        del self.info[:]
-        del self.error[:]
+from graff.util import inet_aton, detect_mobile, Flash
 
 class RequestHandler(tornado.web.RequestHandler):
 
@@ -68,7 +29,7 @@ class RequestHandler(tornado.web.RequestHandler):
 
         host = self.request.headers.get('Host').lower()
         if self.get_cookie('m', None) is None:
-            if detect_mobile_browser(self.request.headers.get('User-Agent')):
+            if detect_mobile(self.request.headers.get('User-Agent')):
                 self.set_cookie('m', '1')
                 mobile = True
                 if host in ('grafspotting.com', 'www.grafspotting.com'):
