@@ -10,7 +10,6 @@ from PIL.ExifTags import GPSTAGS, TAGS
 from tornado.escape import url_escape, url_unescape
 import tornado.template
 import tornado.web
-from tornado.web import RequestHandler
 
 from graff import db
 from graff import config
@@ -119,7 +118,6 @@ class HomeHandler(RequestHandler):
     path = '/'
 
     def get(self):
-        recent = []
         self.env['recent_photos'] = list(db.Photo.most_recent(self.session, 20))
         v = lambda x: x is not None
         self.env['latlng'] = [{'lat': p.latitude, 'lng': p.longitude} for p in self.env['recent_photos'] if v(p.latitude) and v(p.longitude)]
@@ -186,7 +184,7 @@ class LoginHandler(RequestHandler):
     def post(self):
         name = self.get_argument('name')
         password = self.get_argument('password')
-        user = db.User.authenticate(self.session, name, password, self.request.remote_ip)
+        user = db.User.authenticate(self.session, name, password, inet_aton(self.request.remote_ip))
         if user:
             self.set_secure_cookie('s', user.encid)
             self.redirect('/')

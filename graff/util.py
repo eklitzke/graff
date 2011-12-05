@@ -1,10 +1,7 @@
 import socket
 import struct
 from tornado.escape import xhtml_escape
-try:
-    import simplejson as json
-except ImportError:
-    import json
+import simplejson as json
 
 class Flash(object):
 

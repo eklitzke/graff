@@ -1,7 +1,7 @@
 import datetime
 import hashlib
 from sqlalchemy import create_engine, Column, ForeignKey
-from sqlalchemy.types import Integer, String, Text, Float, DateTime, Boolean
+from sqlalchemy.types import Integer, String, Float, DateTime, Boolean
 from sqlalchemy.orm import sessionmaker, relationship, backref
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -115,7 +115,7 @@ class User(Base):
             return None
         row_hash = row.pw_hash.decode('hex')
         if hashlib.sha1(str(row_hash[:8]) + password.encode('ascii')).digest() == row_hash[8:]:
-            row.login_ip = graff.util.inet_aton(remote_ip)
+            row.login_ip = remote_ip
             return row
         return None
 

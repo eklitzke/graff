@@ -1,6 +1,5 @@
 import base64
 from hashlib import sha1
-import os
 import struct
 from Crypto.Cipher import DES3
 
