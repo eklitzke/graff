@@ -1,5 +1,6 @@
 import optparse
 import os
+import tornado.httpserver
 import tornado.ioloop
 import tornado.web
 from graff.handlers import handlers
@@ -20,12 +21,15 @@ if __name__ == '__main__':
     parser.add_option('-c', '--config', help='Path to the config file')
     parser.add_option('-d', '--debug', action='store_true', default=False)
     parser.add_option('-p', '--port', type='int', default=8000)
+    parser.add_option('-n', '--num-procs', type='int', default=0)
     opts, args = parser.parse_args()
     config.load_config(opts.config)
     settings['cookie_secret'] = config.get('cookie_secret', '----------------')
     settings['debug'] = opts.debug
     app = tornado.web.Application(handlers, **settings)
-    app.listen(opts.port)
+    server = tornado.httpserver.HTTPServer(app, xheaders=True)
+    server.bind(opts.port)
+    server.start(1 if opts.debug else opts.num_procs)
     tornado.ioloop.IOLoop.instance().start()
 else:
     app = tornado.web.Application(handlers, **settings)

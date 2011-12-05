@@ -17,39 +17,42 @@ from graff.util import inet_aton, detect_mobile, Flash
 
 class RequestHandler(tornado.web.RequestHandler):
 
-    def redirect_host(self, new_hostname):
-        redir_loc = self.request.protocol + '://' + new_hostname + self.request.path
-        if self.request.query:
-            redir_loc += '?' + self.request.query
-        self.redirect(redir_loc)
-
     def initialize(self):
         super(RequestHandler, self).initialize()
 
-        host = self.request.headers.get('Host').lower()
-        if self.get_cookie('m', None) is None:
-            if detect_mobile(self.request.headers.get('User-Agent')):
-                self.set_cookie('m', '1')
-                mobile = True
-                if host in ('graffspotting.com', 'www.graffspotting.com'):
-                    self.redirect_host('m.graffspotting.com')
-            else:
-                mobile = False
-                self.set_cookie('m', '0')
-        else:
-            mobile = self.get_cookie('m') == '1'
-            if mobile and host in ('graffspotting.com', 'www.graffspotting.com'):
-                self.redirect_host('m.graffspotting.com')
-            if host == 'www.graffspotting.com':
-                self.redirect_host('graffspotting.com')
-
+        self._force_rollback = False
+        self._session = None
+        self._force_redirect = None
         flash_cookie = self.get_cookie('flash')
         if flash_cookie:
             self.flash = Flash.load(url_unescape(flash_cookie))
         else:
             self.flash = Flash()
-        self._force_rollback = False
-        self._session = None
+
+        host = self.request.host.lower()
+        self.production = (host == 'graffspotting.com' or host.endswith('.graffspotting.com'))
+
+        mobile = None
+        mobile_cookie = self.get_cookie('m', None)
+        if mobile_cookie is None:
+            if detect_mobile(self.request.headers.get('User-Agent')):
+                self.set_cookie('m', '1')
+                mobile = True
+                if host == 'graffspotting.com':
+                    self._force_redirect = 'm.graffspotting.com'
+                    return
+            else:
+                mobile = False
+                self.set_cookie('m', '0')
+        elif host == 'm.graffspotting.com' and mobile_cookie == '0':
+            self._force_redirect = 'graffspotting.com'
+            return
+        elif host == 'graffspotting.com' and mobile_cookie == '1':
+            self._force_redirect = 'm.graffspotting.com'
+            return
+
+        if mobile is None:
+            mobile = mobile_cookie == '1'
 
         user_id = self.get_secure_cookie('s')
         if user_id:
@@ -68,6 +71,25 @@ class RequestHandler(tornado.web.RequestHandler):
             'today': datetime.date.today(),
             'user': self.user
             }
+
+    def prepare(self):
+        """This has to be done in prepare() instead of initialize(), in order
+        for redirects to work with flush().
+        """
+        super(RequestHandler, self).prepare()
+        if self._force_redirect is not None:
+            redir_loc = self.request.protocol + '://' + self._force_redirect + self.request.path
+            if self.request.query:
+                redir_loc += '?' + self.request.query
+            self.redirect(redir_loc)
+
+    def set_cookie(self, name, value, domain=None, **kwargs):
+        if domain is None:
+            if self.production:
+                domain = 'graffspotting.com'
+            else:
+                domain = self.request.host
+        return super(RequestHandler, self).set_cookie(name, value, domain, **kwargs)
 
     @property
     def session(self):
@@ -93,6 +115,7 @@ class RequestHandler(tornado.web.RequestHandler):
         e = {'env': self.env,
              'debug': self.settings['debug'],
              'flash': self.flash,
+             'mobile': self.env['mobile'],
              'is_error': False,
              'user': self.env['user'],
              'title': httplib.responses[status_code],
@@ -211,7 +234,8 @@ class ForceMobileHandler(RequestHandler):
 
     def get(self):
         self.set_cookie('m', '1')
-        self.redirect('/')
+        newhost = 'm.graffspotting.com' if self.request.host == 'graffspotting.com' else self.request.host
+        self.redirect(self.request.protocol + '://' + newhost + '/')
 
 class UnforceMobileHandler(RequestHandler):
 
@@ -219,7 +243,8 @@ class UnforceMobileHandler(RequestHandler):
 
     def get(self):
         self.set_cookie('m', '0')
-        self.redirect('/')
+        newhost = 'graffspotting.com' if self.request.host == 'm.graffspotting.com' else self.request.host
+        self.redirect(self.request.protocol + '://' + newhost + '/')
 
 def construct_path(fsid, content_type, makedirs=False):
     p = os.path.join(os.environ.get('TEMPDIR', '/tmp'), 'graff', fsid[:2], fsid[2:4])
