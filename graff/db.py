@@ -58,6 +58,7 @@ class Photo(Base):
     photo_time = Column(DateTime)
     photo_height = Column(Integer, nullable=False)
     photo_width = Column(Integer, nullable=False)
+    remote_ip = Column(Integer, nullable=False)
     sensor = Column(Boolean)
     time_created = Column(DateTime, nullable=False)
     user_id = Column(Integer, ForeignKey('user.id'))
@@ -90,6 +91,8 @@ class User(Base):
     pw_hash = Column(String(56), nullable=False)
     email = Column(String)
     location = Column(String)
+    signup_ip = Column(Integer, nullable=False)
+    login_ip = Column(Integer, nullable=False)
     time_created = Column(DateTime, nullable=False)
 
     @classmethod
@@ -102,15 +105,17 @@ class User(Base):
             salt = devrandom.read(8)
         hashval = hashlib.sha1(salt + kwargs.pop('password').encode('ascii')).digest()
         kwargs['pw_hash'] = (salt + hashval).encode('hex')
+        kwargs['signup_ip'] = kwargs['login_ip'] = kwargs.pop('remote_ip')
         return super(User, cls).create(session, **kwargs)
 
     @classmethod
-    def authenticate(cls, session, name, password):
+    def authenticate(cls, session, name, password, remote_ip):
         row = session.query(cls).filter(cls.name == name).first()
         if row is None:
             return None
         row_hash = row.pw_hash.decode('hex')
         if hashlib.sha1(str(row_hash[:8]) + password.encode('ascii')).digest() == row_hash[8:]:
+            row.login_ip = graff.util.inet_aton(remote_ip)
             return row
         return None
 

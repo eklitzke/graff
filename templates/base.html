@@ -5,6 +5,10 @@
     <link rel="stylesheet" type="text/css" href="{{static_url('css/base.css')}}" />
     <link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Open+Sans">
     {% block extra_css %}{% end %}
+    {% if mobile %}
+      <link rel="stylesheet" type="text/css" href="{{static_url('css/mobile.css')}}" />
+      {% block mobile_css %}{% end %}
+    {% end %}
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
     <script src="{{static_url('js/base.js')}}"></script>
     {% block extra_js %}{% end %}
@@ -18,16 +22,16 @@
         {% if not user %}
         <a href="/signup">Login/Signup</a>
         {% else %}
-        <span class="user"><a href="/user/{{user.name}}">{{user.name}}</a></span> | <a href="/logout">Logout</a>
+        <span class="user"><a href="/user/{{esc(user.name)}}">{{user.name}}</a></span> | <a href="/logout">Logout</a>
         {% end %}
       </div>
-      {% end %}
-      {% if not is_error %}
-        {% raw flash.render_html() %}
       {% end %}
       <div id="hd">
         {% block head %}
         <a href="/"><img src="{{static_url('images/grafflogo.png')}}"></a>
+        {% end %}
+        {% if not is_error %}
+          {% raw flash.render_html() %}
         {% end %}
         {% block head_text %}{% end %}
       </div> <!-- #hd -->

@@ -1,0 +1,5 @@
+<h2>Upload</h2>
+<form id="imgform" enctype="multipart/form-data" action="/upload" method="POST">
+  {% raw xsrf_form_html() %}
+  <input id="imgfield" name="img" type="file" />
+</form>

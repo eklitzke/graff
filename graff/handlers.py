@@ -7,9 +7,11 @@ import re
 import traceback
 import PIL.Image
 from PIL.ExifTags import GPSTAGS, TAGS
+from tornado.escape import url_escape, url_unescape, xhtml_escape
 import tornado.template
 import tornado.web
 from tornado.web import RequestHandler
+from mobile.sniffer.detect import detect_mobile_browser
 try:
     import simplejson as json
 except ImportError:
@@ -17,6 +19,7 @@ except ImportError:
 
 from graff import db
 from graff import config
+from graff.util import inet_aton
 
 class Flash(object):
 
@@ -38,7 +41,7 @@ class Flash(object):
 
     def render_html(self):
         def render_bit(css_class, message):
-            return '<div class="%s">%s</div>' % (tornado.escape.xhtml_escape(css_class), tornado.escape.xhtml_escape(message))
+            return '<div class="%s">%s</div>' % (xhtml_escape(css_class), xhtml_escape(message))
         divs = []
         for i in self.info:
             divs.append(render_bit('flash_info', i))
@@ -54,11 +57,33 @@ class Flash(object):
 
 class RequestHandler(tornado.web.RequestHandler):
 
+    def redirect_host(self, new_hostname):
+        redir_loc = self.request.protocol + '://' + new_hostname + self.request.path
+        if self.request.query:
+            redir_loc += '?' + self.request.query
+        self.redirect(redir_loc)
+
     def initialize(self):
         super(RequestHandler, self).initialize()
+
+        host = self.request.headers.get('Host').lower()
+        if self.get_cookie('m', None) is None:
+            if detect_mobile_browser(self.request.headers.get('User-Agent')):
+                self.set_cookie('m', '1')
+                mobile = True
+                if host in ('grafspotting.com', 'www.grafspotting.com'):
+                    self.redirect_host('m.grafspotting.com')
+            else:
+                mobile = False
+                self.set_cookie('m', '0')
+        else:
+            mobile = self.get_cookie('m') == '1'
+            if host == 'www.grafspotting.com':
+                self.redirect_host('grafspotting.com')
+
         flash_cookie = self.get_cookie('flash')
         if flash_cookie:
-            self.flash = Flash.load(tornado.escape.url_unescape(flash_cookie))
+            self.flash = Flash.load(url_unescape(flash_cookie))
         else:
             self.flash = Flash()
         self._force_rollback = False
@@ -73,11 +98,13 @@ class RequestHandler(tornado.web.RequestHandler):
         self.env = {
             'config': config,
             'debug': self.settings['debug'],
+            'esc': url_escape,
             'flash': self.flash,
             'gmaps_api_key': config.get('gmaps_api_key', 'AIzaSyCTd_7j6ZeXATLOfTvpAqaqCkxM0zFP5Oc'),
             'is_error': False,
-            'user': self.user,
-            'today': datetime.date.today()
+            'mobile': mobile,
+            'today': datetime.date.today(),
+            'user': self.user
             }
 
     @property
@@ -93,7 +120,7 @@ class RequestHandler(tornado.web.RequestHandler):
             else:
                 self.session.commit()
         if not self.flash.empty:
-            self.set_cookie('flash', tornado.escape.url_escape(self.flash.dump()))
+            self.set_cookie('flash', url_escape(self.flash.dump()))
         elif 'flash' in self.request.cookies:
             self.clear_cookie('flash')
         return super(RequestHandler, self).finish(chunk)
@@ -132,7 +159,7 @@ class HomeHandler(RequestHandler):
 
     def get(self):
         recent = []
-        self.env['recent_photos'] = list(db.Photo.most_recent(self.session, 10))
+        self.env['recent_photos'] = list(db.Photo.most_recent(self.session, 20))
         v = lambda x: x is not None
         self.env['latlng'] = [{'lat': p.latitude, 'lng': p.longitude} for p in self.env['recent_photos'] if v(p.latitude) and v(p.longitude)]
         if self.env['latlng']:
@@ -144,7 +171,7 @@ class HomeHandler(RequestHandler):
             self.env['ne_point'] = {'lat': maxlat, 'lng': maxlng}
         self.render('home.html')
 
-NAME_RE = re.compile(r'[-_~a-zA-Z0-9@!\$]*$')
+NAME_RE = re.compile(r'[#-_~a-zA-Z0-9@!\$&\*\\/^:=\'"]*$')
 class SignupHandler(RequestHandler):
 
     path = '/signup'
@@ -162,6 +189,10 @@ class SignupHandler(RequestHandler):
             self.flash.error.append('That username is reserved.')
             self.redirect('/signup')
             return
+        if len(name) < 2:
+            self.flash.error.append('Username must be at least two characters long.')
+            self.redirect('/signup')
+            return
         if len(name) > 32:
             self.flash.error.append('Username is too long; restrict to at most 32 characters.')
             self.redirect('/signup')
@@ -176,7 +207,8 @@ class SignupHandler(RequestHandler):
             name = name,
             password = password,
             email = email,
-            location = location
+            location = location,
+            remote_ip = inet_aton(self.request.remote_ip)
             )
         if isinstance(user, basestring):
             self.flash.error.append(user)
@@ -184,7 +216,7 @@ class SignupHandler(RequestHandler):
         else:
             self.session.commit()
             self.set_secure_cookie('s', user.encid)
-            self.redirect('/user/' + name)
+            self.redirect('/user/' + url_escape(name))
 
 class LoginHandler(RequestHandler):
 
@@ -193,7 +225,7 @@ class LoginHandler(RequestHandler):
     def post(self):
         name = self.get_argument('name')
         password = self.get_argument('password')
-        user = db.User.authenticate(self.session, name, password)
+        user = db.User.authenticate(self.session, name, password, self.request.remote_ip)
         if user:
             self.set_secure_cookie('s', user.encid)
             self.redirect('/')
@@ -211,6 +243,22 @@ class LogoutHandler(RequestHandler):
         self.redirect('/')
 
     post = get
+
+class ForceMobileHandler(RequestHandler):
+
+    path = '/force_mobile'
+
+    def get(self):
+        self.set_cookie('m', '1')
+        self.redirect('/')
+
+class UnforceMobileHandler(RequestHandler):
+
+    path = '/unforce_mobile'
+
+    def get(self):
+        self.set_cookie('m', '0')
+        self.redirect('/')
 
 def construct_path(fsid, content_type, makedirs=False):
     p = os.path.join(os.environ.get('TEMPDIR', '/tmp'), 'graff', fsid[:2], fsid[2:4])
@@ -239,7 +287,6 @@ class UploadHandler(RequestHandler):
         if gpsinfo['GPSLongitudeRef'] == 'W':
             lng *= -1
         return lat, lng
-
 
     def save_versions(self, img, imgtype, outpath):
 
@@ -295,51 +342,61 @@ class UploadHandler(RequestHandler):
         img_file = StringIO.StringIO(img_fields['body'])
         content_type = img_fields['content_type'].lower()
         img = PIL.Image.open(img_file)
-        raw_info = img._getexif()
-        raw_exif = img.info['exif']
-        info = dict((TAGS.get(k, k), v) for k, v in raw_info.iteritems())
-        if 'Orientation' in info:
-            orientation = info['Orientation']
-            if orientation == 1:
-                pass
-            elif orientation == 2:
-                img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
-            elif orientation == 3:
-                img = img.transpose(PIL.Image.ROTATE_180)
-            elif orientation == 4:
-                img = img.transpose(PIL.Image.FLIP_TOP_BOTTOM)
-            elif orientation == 5:
-                img = img.transpose(PIL.Image.ROTATE_90)
-                img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
-            elif orientation == 6:
-                img = img.transpose(PIL.Image.ROTATE_270)
-            elif orientation == 7:
-                img = img.transpose(PIL.Image.ROTATE_270)
-                img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
-            elif orientation == 8:
-                img = img.transpose(PIL.Image.ROTATE_90)
-        if 'GPSInfo' in info:
-            lat, lng = self.decode_gps(info['GPSInfo'])
-            sensor = True
-        else:
-            lat, lng = None, None
-            sensor = None
-        dt = info.get('DateTime')
-        if dt is not None:
-            dt = datetime.datetime.strptime(dt, '%Y:%m:%d %H:%M:%S')
-        make = info.get('Make')
-        model = info.get('Model')
+
+        do_exif = True
+        try:
+            raw_info = img._getexif()
+        except AttributeError:
+            do_exif = False
+            lat, lng, make, model, dt, sensor = None, None, None, None, None, None
+        if do_exif:
+            raw_exif = img.info['exif']
+            info = dict((TAGS.get(k, k), v) for k, v in raw_info.iteritems())
+            if 'Orientation' in info:
+                orientation = info['Orientation']
+                if orientation == 1:
+                    pass
+                elif orientation == 2:
+                    img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+                elif orientation == 3:
+                    img = img.transpose(PIL.Image.ROTATE_180)
+                elif orientation == 4:
+                    img = img.transpose(PIL.Image.FLIP_TOP_BOTTOM)
+                elif orientation == 5:
+                    img = img.transpose(PIL.Image.ROTATE_90)
+                    img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+                elif orientation == 6:
+                    img = img.transpose(PIL.Image.ROTATE_270)
+                elif orientation == 7:
+                    img = img.transpose(PIL.Image.ROTATE_270)
+                    img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+                elif orientation == 8:
+                    img = img.transpose(PIL.Image.ROTATE_90)
+            if 'GPSInfo' in info:
+                lat, lng = self.decode_gps(info['GPSInfo'])
+                sensor = True
+            else:
+                lat, lng = None, None
+                sensor = None
+            dt = info.get('DateTime')
+            if dt is not None:
+                dt = datetime.datetime.strptime(dt, '%Y:%m:%d %H:%M:%S')
+            make = info.get('Make')
+            model = info.get('Model')
         
         fsid = os.urandom(16).encode('hex')
         fspath = construct_path(fsid, content_type, makedirs=True)
 
         if content_type == 'image/jpeg':
             pil_type = 'JPEG'
+        elif content_type == 'image/png':
+            pil_type = 'PNG'
         else:
             pil_type = None
 
-        with open(fspath + '.exif', 'wb') as f:
-            f.write(raw_exif)
+        if do_exif:
+            with open(fspath + '.exif', 'wb') as f:
+                f.write(raw_exif)
         self.save_versions(img, pil_type, fspath)
 
         row = db.Photo.create(
@@ -354,6 +411,7 @@ class UploadHandler(RequestHandler):
             photo_time = dt,
             photo_width = img.size[0],
             photo_height = img.size[1],
+            remote_ip = inet_aton(self.request.remote_ip),
             sensor = sensor,
             user_id = self.user.id if self.user else None
             )
@@ -419,7 +477,7 @@ class UserHandler(RequestHandler):
     def get(self, user_name):
         target_user = db.User.by_name(self.session, user_name)
         if target_user is None:
-            raise HTTPError(httplib.NOT_FOUND)
+            raise tornado.web.HTTPError(httplib.NOT_FOUND)
         self.env['target_user'] = target_user
         self.render('user.html')
 

@@ -1,0 +1,21 @@
+<h2>Recent Uploads</h2>
+<div id="uploads">
+  <div id="uploads_box">
+    <ul>
+      {% for photo in recent_photos %}
+      <li>
+        <a href="/photo/{{photo.encid}}" class="label"> &nbsp;&nbsp; <img src="/p/{{photo.encid}}.ts"> {{photo.time_ago}}</a> by
+        {% if photo.user is not None %}
+        <span class="user"><a href="/user/{{esc(photo.user.name)}}">{{photo.user.name}}</a></span>
+        {% else %}
+        Anonymous
+        {% end %}
+      </li>
+      {% end %}
+    </ul>
+  </div>
+  {% if do_map %}
+  <div id="uploads_map"></div>
+  {% end %}
+  <div class="clearboth"></div>
+</div>

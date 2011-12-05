@@ -21,7 +21,7 @@
 </div>
 <label>Uploader:</label>
 {% if photo.user %}
-<span class="user"><a href="/user/{{photo.user.name}}">{{photo.user.name}}</a></span>
+<span class="user"><a href="/user/{{esc(photo.user.name)}}">{{photo.user.name}}</a></span>
 {% else %}
 Anonymous
 {% end %}

@@ -4,12 +4,14 @@ import tornado.ioloop
 import tornado.web
 from graff.handlers import handlers
 from graff import config
+from graff.ui import modules
 
 def p(name):
     return os.path.realpath(os.path.join(os.path.dirname(__file__), '..', name))
 settings = {
     'static_path': p('static'),
     'template_path': p('templates'),
+    'ui_modules': modules
     }
 del p
 

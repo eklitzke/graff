@@ -4,6 +4,8 @@ CREATE TABLE user (
   pw_hash CHAR(56) NOT NULL,
   email VARCHAR(128),
   location VARCHAR(128),
+  signup_ip INTEGER UNSIGNED NOT NULL,
+  login_ip INTEGER UNSIGNED NOT NULL,
   time_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY (`name`),

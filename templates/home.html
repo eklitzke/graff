@@ -1,13 +1,16 @@
 {% extends "base.html" %}
 
 {% block extra_css %}
-    <link rel="stylesheet" type="text/css" href="{{static_url('css/home.css')}}">
+<link rel="stylesheet" type="text/css" href="{{static_url('css/home.css')}}">
+{% end %}
+
+{% block mobile_css %}
+<link rel="stylesheet" type="text/css" href="{{static_url('css/m_home.css')}}">
 {% end %}
 
 {% block extra_js %}
-    <script type="text/javascript" src="//maps.googleapis.com/maps/api/js?key={{gmaps_api_key}}&sensor=true"></script>
-    <script type="text/javascript" src="{{static_url('js/home.js')}}"></script>
-
+<script type="text/javascript" src="//maps.googleapis.com/maps/api/js?key={{gmaps_api_key}}&sensor=true"></script>
+<script type="text/javascript" src="{{static_url('js/home.js')}}"></script>
 <script type="text/javascript">
 {% if latlng %}
 var markers = [
@@ -35,52 +38,15 @@ Welcome, <span class="user">{{ user.name }}</span>. Perhaps you'd like to upload
 {% end %}
 
 {% block body %}
-<h2>Upload</h2>
-<form id="imgform" enctype="multipart/form-data" action="/upload" method="POST">
-  {% raw xsrf_form_html() %}
-  <input id="imgfield" name="img" type="file" />
-</form>
 
-<h2>Recent Uploads</h2>
-<div id="uploads">
-  <div id="uploads_box">
-    <ul>
-      {% for photo in recent_photos %}
-      <li>
-        <a href="/photo/{{photo.encid}}" class="label"> &nbsp;&nbsp; <img src="/p/{{photo.encid}}.ts"> {{photo.time_ago}}</a> by
-        {% if photo.user is not None %}
-        <span class="user"><a href="/user/{{photo.user.name}}">{{photo.user.name}}</a></span>
-        {% else %}
-        Anonymous
-        {% end %}
-      </li>
-      {% end %}
-    </ul>
-  </div>
-  <div id="uploads_map"></div>
-  <div class="clearboth"></div>
-</div>
+{% if mobile %}
+  {% raw modules.PhotoUpload() %}
+  {% raw modules.RecentPhotos(recent_photos, esc, False) %}
+{% else %}
+  {% raw modules.RecentPhotos(recent_photos, esc, True) %}
+  {% raw modules.PhotoUpload() %}
+  {% raw modules.About() %}
+{% end %}
 
-<h2>About</h2>
-
-There are lots of great sites on the web for finding awesome pictures of
-graffiti/street art in your hood. The problem is that these sites never show
-you <em>where</em> the graffiti is located, or if it's still there. That 20'
-Swampy piece that someone just uploaded to Flickr is awesome; but
-what's <em>really</em> awesome is if you can hop on your bike and go find it,
-and see it in meatspace.
-
-<p>
-  
-The idea for <em>Graff Spotting</em> is to be a graffiti blog that incorporates
-location data. You can either directly enter where you took a picture, or if
-your camera supports geolocation data (e.g. if you took a photo from your
-iPhone/Android/mobile phone), the picture can be automatically tagged with
-location data.
-        
-<!--
-<p>
-One day there might be an Android or iPhone app. No promises, though.
--->
 
 {% end %}
