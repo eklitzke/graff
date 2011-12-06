@@ -31,12 +31,16 @@ class _Base(object):
         return obj
 
     @classmethod
+    def by_id(cls, session, row_id):
+        return session.query(cls).filter(cls.id == row_id).first()
+
+    @classmethod
     def from_encid(cls, session, encid):
         if hasattr(cls, 'key_secret'):
             row_id = crypto.decid(encid, cls.key_secret)
         else:
             row_id = crypto.decid(encid)
-        return session.query(cls).filter(cls.id == row_id).first()
+        return cls.by_id(session, row_id)
 
     @classmethod
     def most_recent(cls, session, limit):

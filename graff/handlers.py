@@ -4,6 +4,8 @@ import hashlib
 import httplib
 import os
 import re
+import struct
+import time
 import traceback
 import PIL.Image
 from PIL.ExifTags import GPSTAGS, TAGS
@@ -13,6 +15,7 @@ import tornado.web
 
 from graff import db
 from graff import config
+from graff import crypto
 from graff.util import inet_aton, detect_mobile, Flash
 
 class RequestHandler(tornado.web.RequestHandler):
@@ -56,9 +59,14 @@ class RequestHandler(tornado.web.RequestHandler):
 
         user_id = self.get_secure_cookie('s')
         if user_id:
-            self.user = db.User.from_encid(self.session, user_id)
+            user_id, = struct.unpack('<I', user_id)
+            self.user = db.User.by_id(self.session, user_id)
         else:
             self.user = None
+
+        # ensure the user has a unique visitor cookie
+        if self.get_secure_cookie('v', None) is None:
+            self.set_secure_cookie('v', os.urandom(10))
 
         self.env = {
             'config': config,
@@ -87,6 +95,25 @@ class RequestHandler(tornado.web.RequestHandler):
         if domain is None and self.production:
             domain = 'graffspotting.com'
         return super(RequestHandler, self).set_cookie(name, value, domain, **kwargs)
+
+    def set_secure_cookie(self, name, value, key=None, timestamp=True, **kwargs):
+        value = str(value)
+        if timestamp:
+            value += struct.pack('<I', int(time.time()))
+        return self.set_cookie(name, crypto.encrypt_string(value, key=key), **kwargs)
+
+    def get_secure_cookie(self, name, default=None, key=None, timestamp=True):
+        val = self.get_cookie(name, default)
+        if val == default:
+            return val
+        try:
+            val = crypto.decrypt_string(val, key=key)
+            if timestamp:
+                val = val[:-struct.calcsize('<I')] # chop off the timestamp
+            return val
+        except ValueError:
+            self.clear_cookie(name)
+            return default
 
     @property
     def session(self):
@@ -196,7 +223,7 @@ class SignupHandler(RequestHandler):
             self.redirect('/signup')
         else:
             self.session.commit()
-            self.set_secure_cookie('s', user.encid)
+            self.set_secure_cookie('s', struct.pack('<I', user.id))
             self.redirect('/user/' + url_escape(name))
 
 class LoginHandler(RequestHandler):
@@ -208,7 +235,7 @@ class LoginHandler(RequestHandler):
         password = self.get_argument('password')
         user = db.User.authenticate(self.session, name, password, inet_aton(self.request.remote_ip))
         if user:
-            self.set_secure_cookie('s', user.encid)
+            self.set_secure_cookie('s', struct.pack('<I', user.id))
             self.redirect('/')
         else:
             self.flash.error.append('Failed to login with that username/password')
