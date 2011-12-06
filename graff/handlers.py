@@ -84,11 +84,8 @@ class RequestHandler(tornado.web.RequestHandler):
             self.redirect(redir_loc)
 
     def set_cookie(self, name, value, domain=None, **kwargs):
-        if domain is None:
-            if self.production:
-                domain = 'graffspotting.com'
-            else:
-                domain = self.request.host
+        if domain is None and self.production:
+            domain = 'graffspotting.com'
         return super(RequestHandler, self).set_cookie(name, value, domain, **kwargs)
 
     @property
