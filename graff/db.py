@@ -1,26 +1,35 @@
 import datetime
 import hashlib
-from sqlalchemy import create_engine, Column, ForeignKey
+import os
+import re
+from sqlalchemy import create_engine, func, Column, ForeignKey
 from sqlalchemy.types import Integer, String, Float, DateTime, Boolean
 from sqlalchemy.orm import sessionmaker, relationship, backref
 from sqlalchemy.ext.declarative import declarative_base
+import warnings
 
 from graff import config
 from graff import crypto
 
-engine = create_engine('mysql+mysqldb://' +
-                       config.get('db_user', 'graff') + ':' +
-                       config.get('db_pass', 'gr4ff') + '@' + 
-                       config.get('db_host', '127.0.0.1') + '/' +
-                       config.get('db_schema', 'graff'), pool_recycle=3600)
+if config.get('memory', True):
+    engine = create_engine('sqlite:///:memory:')
+    now = func.datetime()
+else:
+    engine = create_engine('mysql+mysqldb://' +
+                           config.get('db_user', 'graff') + ':' +
+                           config.get('db_pass', 'gr4ff') + '@' +
+                           config.get('db_host', '127.0.0.1') + '/' +
+                           config.get('db_schema', 'graff'), pool_recycle=3600)
+    now = func.now()
+
 Session = sessionmaker(bind=engine)
 
 class _Base(object):
 
     @property
     def encid(self):
-        if hasattr(self, 'key_secret'):
-            return crypto.encid(self.id, self.key_secret)
+        if hasattr(self, 'secret_key'):
+            return crypto.encid(self.id, self.secret_key)
         else:
             return crypto.encid(self.id)
 
@@ -36,8 +45,8 @@ class _Base(object):
 
     @classmethod
     def from_encid(cls, session, encid):
-        if hasattr(cls, 'key_secret'):
-            row_id = crypto.decid(encid, cls.key_secret)
+        if hasattr(cls, 'secret_key'):
+            row_id = crypto.decid(encid, cls.secret_key)
         else:
             row_id = crypto.decid(encid)
         return cls.by_id(session, row_id)
@@ -59,12 +68,12 @@ class Photo(Base):
     longitude = Column(Float)
     make = Column(String(128))
     model = Column(String(128))
-    photo_time = Column(DateTime)
+    photo_time = Column(DateTime, nullable=False, default=now)
     photo_height = Column(Integer, nullable=False)
     photo_width = Column(Integer, nullable=False)
     remote_ip = Column(Integer, nullable=False)
     sensor = Column(Boolean)
-    time_created = Column(DateTime, nullable=False)
+    time_created = Column(DateTime, nullable=False, default=now)
     user_id = Column(Integer, ForeignKey('user.id'))
 
     user = relationship('User', backref=backref('photos', order_by=id))
@@ -97,7 +106,7 @@ class User(Base):
     location = Column(String)
     signup_ip = Column(Integer, nullable=False)
     login_ip = Column(Integer, nullable=False)
-    time_created = Column(DateTime, nullable=False)
+    time_created = Column(DateTime, nullable=False, default=now)
 
     @classmethod
     def create(cls, session, **kwargs):
@@ -126,3 +135,31 @@ class User(Base):
     @classmethod
     def by_name(cls, session, name):
         return session.query(cls).filter(cls.name == name).first()
+
+# set up encryption keys
+g = globals()
+crypto_keys = set()
+for k, v in g.items():
+    find_key = False
+    try:
+        if issubclass(v, Base) and v is not Base:
+            find_key = True
+    except TypeError:
+        continue
+    if find_key:
+        if 'secret_key' in v.__dict__:
+            warnings.warn('static key set for %s' % (v,))
+        elif config.get('key_' + v.__name__) is not None:
+            v.secret_key = config.get('key_' + v.__name__)
+        elif config.get('memory'):
+            v.secret_key = os.urandom(16)
+        else:
+            v.secret_key = '?' * 16
+        if v.secret_key in crypto_keys:
+            warnings.warn('re-using crypto key for %s' % (v,))
+        crypto_keys.add(v.secret_key)
+del crypto_keys
+del g
+
+if config.get('memory', True):
+    Base.metadata.create_all(engine)

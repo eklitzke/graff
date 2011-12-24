@@ -97,12 +97,16 @@ class RequestHandler(tornado.web.RequestHandler):
         return super(RequestHandler, self).set_cookie(name, value, domain, **kwargs)
 
     def set_secure_cookie(self, name, value, key=None, timestamp=True, **kwargs):
+        if key is None:
+            key = config.get('cookie_secret')
         value = str(value)
         if timestamp:
             value += struct.pack('<I', int(time.time()))
         return self.set_cookie(name, crypto.encrypt_string(value, key=key), **kwargs)
 
     def get_secure_cookie(self, name, default=None, key=None, timestamp=True):
+        if key is None:
+            key = config.get('cookie_secret')
         val = self.get_cookie(name, default)
         if val == default:
             return val
@@ -119,6 +123,7 @@ class RequestHandler(tornado.web.RequestHandler):
     def session(self):
         if self._session is None:
             self._session = db.Session()
+            self._session.rollback() # XXX: fixme
         return self._session
 
     def finish(self, chunk=None):
@@ -155,6 +160,17 @@ class RequestHandler(tornado.web.RequestHandler):
 
     def render(self, name):
         return super(RequestHandler, self).render(name, **self.env)
+
+class DebugHandler(RequestHandler):
+
+    path = '/debug'
+
+    def get(self):
+        try:
+            import ipdb as pdb
+        except ImportError:
+            import pdb
+        pdb.set_trace()
 
 class NotFoundHandler(RequestHandler):
     """Generates an error response with status_code for all requests."""
@@ -283,7 +299,7 @@ class UploadHandler(RequestHandler):
     def decode_gps(self, gps_field):
         gpsinfo = dict((GPSTAGS.get(k, k), v) for k, v in gps_field.iteritems())
         for field in ('GPSLatitudeRef', 'GPSLatitude', 'GPSLatitudeRef', 'GPSLongitude'):
-            assert field in gpsinfo
+            assert field in gpsinfo, 'failed to find field %s: %r' % (field, gpsinfo)
         assert all(x == 1 for _, x in gpsinfo['GPSLatitude'])
         assert all(x == 1 for _, x in gpsinfo['GPSLongitude'])
         assert gpsinfo['GPSLatitudeRef'] in 'NS'
@@ -305,7 +321,7 @@ class UploadHandler(RequestHandler):
                 i.save(f, imgtype)
 
         # save the original size
-        save_img(img, 'o') 
+        save_img(img, 'o')
         img_width, img_height = img.size
 
         if img_width == img_height:
@@ -393,7 +409,7 @@ class UploadHandler(RequestHandler):
                 dt = datetime.datetime.strptime(dt, '%Y:%m:%d %H:%M:%S')
             make = info.get('Make')
             model = info.get('Model')
-        
+
         fsid = os.urandom(16).encode('hex')
         fspath = construct_path(fsid, content_type, makedirs=True)
 
@@ -434,7 +450,10 @@ class PhotoViewHandler(RequestHandler):
 
     def get(self, photo_id):
         self.env['photo_id'] = photo_id
-        photo = db.Photo.from_encid(self.session, photo_id)
+        try:
+            photo = db.Photo.from_encid(self.session, photo_id)
+        except crypto.InvalidEncryptedId:
+            raise tornado.web.HTTPError(404)
         self.env['photo'] = photo
         if self.user and photo.user and photo.user.id == self.user.id:
             self.env['own_photo'] = True
@@ -461,8 +480,14 @@ class PhotoHandler(RequestHandler):
         else:
             self.redirect('/p/' + photo_id + '.o')
             return
-
-        photo = db.Photo.from_encid(self.session, encid)
+        try:
+            photo = db.Photo.from_encid(self.session, encid)
+        except crypto.InvalidEncryptedId:
+            import ipdb; ipdb.set_trace()
+            raise tornado.web.HTTPError(404)
+        if photo is None:
+            import ipdb; ipdb.set_trace()
+            raise tornado.web.HTTPError(404)
         self.set_header('Content-Type', photo.content_type)
 
         if photo.photo_time:

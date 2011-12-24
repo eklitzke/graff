@@ -1,15 +1,19 @@
 import base64
 import binascii
 import hashlib
+import os
 import struct
 from Crypto.Cipher import DES3
 
 from graff import config
 
-_default_secret = '?' * 16
-crypto_secret = config.get('crypto_secret', _default_secret)
-if crypto_secret != _default_secret:
+crypto_secret = config.get('crypto_secret', None)
+if crypto_secret is not None:
     crypto_secret = crypto_secret.decode('hex')
+elif config.get('memory', False):
+    default_secret = os.urandom(16)
+else:
+    crypto_secret = '?' * 16
 
 ##
 # from "tempest"
