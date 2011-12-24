@@ -296,20 +296,23 @@ class UploadHandler(RequestHandler):
 
     path = '/upload'
 
+    @staticmethod
+    def decode_gps_ref(field):
+        return (
+            float(field[0][0]) / float(field[0][1]) +
+            float(field[1][0]) / float(field[1][1]) / 60.0 +
+            float(field[2][0]) / float(field[2][1]) / 3600.0)
+
     def decode_gps(self, gps_field):
         gpsinfo = dict((GPSTAGS.get(k, k), v) for k, v in gps_field.iteritems())
         for field in ('GPSLatitudeRef', 'GPSLatitude', 'GPSLatitudeRef', 'GPSLongitude'):
             assert field in gpsinfo, 'failed to find field %s: %r' % (field, gpsinfo)
-        assert all(x == 1 for _, x in gpsinfo['GPSLatitude'])
-        assert all(x == 1 for _, x in gpsinfo['GPSLongitude'])
         assert gpsinfo['GPSLatitudeRef'] in 'NS'
         assert gpsinfo['GPSLongitudeRef'] in 'EW'
-        lat = gpsinfo['GPSLatitude']
-        lat = lat[0][0] + lat[1][0] / 60.0 + lat[2][0] / 3600.0
+        lat = self.decode_gps_ref(gpsinfo['GPSLatitude'])
         if gpsinfo['GPSLatitudeRef'] == 'S':
             lat *= -1
-        lng = gpsinfo['GPSLongitude']
-        lng = lng[0][0] + lng[1][0] / 60.0 + lng[2][0] / 3600.0
+        lng = self.decode_gps_ref(gpsinfo['GPSLongitude'])
         if gpsinfo['GPSLongitudeRef'] == 'W':
             lng *= -1
         return lat, lng
