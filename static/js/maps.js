@@ -35,6 +35,7 @@ GS.addMarker = function (map, position, photo) {
         position: position,
         map: map
     });
+    m._photo_id = photo.id;
     if (photo) {
         google.maps.event.addListener(m, 'click', function () {
             var content = '\
@@ -127,9 +128,26 @@ GS.initializeRecentMap = function (map, photos, updateParams) {
 
 // initialize a cleared "nearby" map
 GS.initializeNearbyMap = function (map, updateParams) {
+    map.setZoom(10);
     GS.updatePoints(map, updateParams);
     google.maps.event.addListener(map, "bounds_changed", function() { GS.updatePoints(map, updateParams); });
 };
+
+GS.getNearbyPosition = function (callback) {
+    var position = new google.maps.LatLng(GS.unionStationCoords["lat"], GS.unionStationCoords["lng"]);
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function (pos) {
+            callback(new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+        }, function () {
+            // getCurrentPosition failed
+            callback(position);
+        });
+    } else {
+        // no navigator.geolocation
+        callback(position);
+    }
+};
+
 
 GS.updatePoints = function (map, params) {
     params = params || {};
@@ -143,20 +161,25 @@ GS.updatePoints = function (map, params) {
     params['e'] = ne.lng();
     params['w'] = sw.lng();
 
-    var ts = (new Date()).valueOf();
+    var t1 = (new Date()).valueOf();
     $.get('/photos', params, function(data) {
         if (debug === true) {
-            var te = (new Date()).valueOf();
-            $("#time_elapsed").html("search completed in <strong>" + parseInt(data.time_ms) + " / " + parseInt(te - ts) + "</strong> ms");
+            var t2 = (new Date()).valueOf();
         }
+
+        var bounds = map.getBounds();
+        console.info(bounds);
+        var uploads_list = $("#uploads_list");
 
         // remove all of the old markers, by checking if they still exist in
         // the new bounding box
-        for (var i = 0; i < map._markers.length; i++) {
-            if (!bounds.contains(map._markers[i].getPosition())) {
-                map._markers[i].setMap(null);
+        for (var i = map._markers.length - 1; i >= 0; i--) {
+            var m = map._markers[i];
+            if (!bounds.contains(m.getPosition())) {
+                m.setMap(null);
                 map._markers.splice(i, 1);
-                i--;
+                console.info('removing photo ' + m._photo_id);
+                $('#li_' + m._photo_id).remove();
             }
         }
 
@@ -165,13 +188,38 @@ GS.updatePoints = function (map, params) {
         for (var i = 0; i < data.photos.length; i++) {
             var p = data.photos[i];
             var position = new google.maps.LatLng(p.latitude, p.longitude);
+            if (!bounds.contains(position)) {
+                // this isn't supposed to happen, but if it does, just ignore
+                // it. it would be really nice to fix this, however
+                continue;
+            }
             if (map._oldBounds === null || map._markers.length === 0 || !map._oldBounds.contains(position)) {
                 var position = new google.maps.LatLng(p.latitude, p.longitude);
                 var m = GS.addMarker(map, position, p);
+                map._markers.push(m);
+                console.info('adding photo ' + m._photo_id);
+                if (uploads_list) {
+                    $('#li_' + m._photo_id).remove(); // XXX: this should NOT be necessary
+                    var liContent = ('<li id="li_' + p.id + '">' +
+                                     '<a href="/photo/' + p.id + '">' +
+                                     '<img src="/p/' + p.id + '.t"> ' +
+                                     '<strong>' + p.time_ago + '</strong>' +
+                                     '</a>');
+                    if (p.user) {
+                        liContent += (' by <a href="/user/' + encodeURI(p.user) +
+                                      '" class="user">' + escape(p.user) + '</a>');
+                    }
+                    liContent += '</li>';
+                    uploads_list.prepend(liContent);
+                }
             }
         }
         
         map._oldBounds = bounds;
+        if (debug === true) {
+            var t3 = (new Date()).valueOf();
+            $("#time_elapsed").html("search completed in <strong>" + parseInt(data.time_ms) + " / " + (t2 - t1) + " / " + (t3 - t1) + "</strong> ms");
+        }
     });
 };
 
@@ -194,44 +242,26 @@ $(document).ready(function () {
     } else {
         mapOptions.zoom = 10;
         mapOptions.center = new google.maps.LatLng(GS.unionStationCoords["lat"], GS.unionStationCoords["lng"]);
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function (pos) {
-                mapOptions.center = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-                map = GS.createMap("map_div", mapOptions, function (map) {
-                    GS.initializeNearbyMap(map, {});
-                });
-            }, function (err) {
-                map = GS.createMap("map_div", mapOptions, function (map) {
-                    GS.initializeNearbyMap(map, {});
-                });
-            });
-        } else {
+        GS.getNearbyPosition(function (position) {
+            mapOptions.center = position;
             map = GS.createMap("map_div", mapOptions, function (map) {
                 GS.initializeNearbyMap(map, {});
             });
-        }
+        });
     }
 
     // set up the click handlers for the map mode
     $('.map_mode').click(function () {
         console.info("resetting map");
-        GS.resetMap(map);
         if ($(this).text() == 'recent') {
             $.cookie('mm', 0);
-            $.get("/photos", function (data) {
-                GS.initializeRecentMap(map, data.photos);
-            });
+            window.location = window.location;
         } else if ($(this).text() == 'nearby') {
             $.cookie('mm', 1);
-            console.info("initializing nearby map");
-            GS.initializeNearbyMap(map, {});
+            window.location = window.location;
         } else {
             alert('huh?');
         }
-        $('.selected_mode').each(function (i, e) {
-            $(e).removeClass('selected_mode');
-        });
-        $(this).addClass('selected_mode');
     });
 
 });

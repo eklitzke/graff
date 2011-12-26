@@ -119,6 +119,7 @@ class Photo(Base):
             'id': self.encid,
             'latitude': self.latitude,
             'longitude': self.longitude,
+            'time_ago': self.time_ago,
             'time_created': int(self.time_created.strftime('%s')),
             'user': self.user.name if self.user_id else None
             }

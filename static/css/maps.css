@@ -1,7 +1,7 @@
 .infowindow { color: #000; }
 
-#uploads_h_container { float: left; }
-#mode_container { float: left; margin-left: 3em; font-size: 20px; font-weight: 900; margin-top: 1em; color: #f1f1ef; }
+#uploads_h_container { float: left; width: 350px; }
+#mode_container { float: left; margin-left: 0; font-size: 20px; font-weight: 900; margin-top: 1em; color: #f1f1ef; }
 .selected_mode { color: #cea5fd !important; }
 
 #uploads_box { width: 350px; float: left; }
