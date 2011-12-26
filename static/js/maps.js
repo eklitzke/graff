@@ -74,7 +74,7 @@ GS.resetMap = function (map) {
 GS.fitMapBounds = function (map, bounds, cb) {
     map.fitBounds(bounds);
     var zoomChangeBoundsListener = 
-        google.maps.event.addListener(map, "bounds_changed", function(event) {
+        google.maps.event.addListener(map, "idle", function(event) {
             // don't let the map get overly zoomed in when we're detecting
             // bounds, anything past 12 is ridiculous (and might happen if
             // there's just a single photo within the bounds, or something like
@@ -147,7 +147,6 @@ GS.getNearbyPosition = function (callback) {
         callback(position);
     }
 };
-
 
 GS.updatePoints = function (map, params) {
     params = params || {};
@@ -255,13 +254,23 @@ $(document).ready(function () {
         console.info("resetting map");
         if ($(this).text() == 'recent') {
             $.cookie('mm', 0);
-            window.location = window.location;
+            $.get("/photos", {}, function (data) {
+                GS.initializeRecentMap(map, data.photos, {});
+            });
         } else if ($(this).text() == 'nearby') {
             $.cookie('mm', 1);
-            window.location = window.location;
+            GS.getNearbyPosition(function (p) {
+                map.setCenter(p);
+                map.setZoom(10);
+            });
         } else {
             alert('huh?');
         }
+        $('.selected_mode').each(function (i, e) {
+            $(e).removeClass('selected_mode');
+        });
+        $(this).addClass('selected_mode');
+
     });
 
 });
