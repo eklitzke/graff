@@ -4,8 +4,10 @@
   </div>
   <div id="mode_container">
     mode:
-    <span id="mode_recent" class="clickable map_mode {% if mode == 'recent' %} selected_mode{% end %}">recent</span> /
-    <span id="mode_nearby" class="clickable map_mode {% if mode == 'nearby' %} selected_mode{% end %}">nearby</span>
+    <span id="mode_recent" class="clickable map_mode {% if mode == 'recent' %} selected_mode{% end %}"
+          title="All recent photos, including those without location data.">recent</span> /
+    <span id="mode_nearby" class="clickable map_mode {% if mode == 'nearby' %} selected_mode{% end %}"
+          title="All photos near you; make sure you allow access to your browser's location.">nearby</span>
   </div>
   <div class="clearboth"></div>
   {% if do_uploads %}

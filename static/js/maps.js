@@ -2,11 +2,8 @@
 //
 // Copyright Evan Klitzke, 2011
 
-GS.oldBounds = null;
-GS.markers = [];
 GS.mapMode = 0;
 GS.map = null;
-GS.boundsListener = null;
 
 GS.unionStationCoords = {
     "lat": 34.056177,
@@ -30,6 +27,24 @@ GS.formatTime = function (timestamp) {
     return s;
 };
 
+GS.showMarkerWindow = function (map, marker, photo) {
+    var content = '\
+<div class="infowindow clickable">\
+<img src="/p/' + photo.id + '.m">\
+<br>\
+Uploaded ' + GS.formatTime(photo.time_created);
+    if (photo.user) {
+        content += ' by <a href="/user/' + encodeURI(photo.user) + '">' + escape(photo.user) + '</a>';
+    }
+    content += '</div>';
+    map._infoWindow.setContent(content);
+    map._infoWindow.open(map, marker);
+    $('.infowindow').click(function (e) {
+        e.preventDefault();
+        window.location = "/photo/" + photo.id;
+    });
+};
+
 GS.addMarker = function (map, position, photo) {
     var m = new google.maps.Marker({
         position: position,
@@ -37,25 +52,10 @@ GS.addMarker = function (map, position, photo) {
     });
     m._photo_id = photo.id;
     if (photo) {
-        google.maps.event.addListener(m, 'click', function () {
-            var content = '\
-<div class="infowindow clickable">\
-<img src="/p/' + photo.id + '.m">\
-<br>\
-Uploaded ' + GS.formatTime(photo.time_created);
-            if (photo.user) {
-                content += ' by <a href="/user/' + encodeURI(photo.user) + '">' + escape(photo.user) + '</a>';
-            }
-            content += '</div>';
-            map._infoWindow.setContent(content);
-            map._infoWindow.open(map, m);
-            $('.infowindow').click(function (e) {
-                e.preventDefault();
-                window.location = "/photo/" + photo.id;
-            });
+        google.maps.event.addListener(m, "click", function () {
+            GS.showMarkerWindow(map, m, photo);
         });
     }
-    GS.markers.push(m);
     return m;
 };
 
@@ -106,6 +106,7 @@ GS.createMap = function (divName, mapOptions, cb) {
             cb(map);
         });
     }
+    GS.map = map; // naughty
     return map;
 };
 
@@ -167,7 +168,6 @@ GS.updatePoints = function (map, params) {
         }
 
         var bounds = map.getBounds();
-        console.info(bounds);
         var uploads_list = $("#uploads_list");
 
         // remove all of the old markers, by checking if they still exist in
@@ -199,7 +199,7 @@ GS.updatePoints = function (map, params) {
                 console.info('adding photo ' + m._photo_id);
                 if (uploads_list) {
                     $('#li_' + m._photo_id).remove(); // XXX: this should NOT be necessary
-                    var liContent = ('<li id="li_' + p.id + '">' +
+                    var liContent = ('<li class="mapLi" id="li_' + p.id + '">' +
                                      '<a href="/photo/' + p.id + '">' +
                                      '<img src="/p/' + p.id + '.t"> ' +
                                      '<strong>' + p.time_ago + '</strong>' +
@@ -210,6 +210,15 @@ GS.updatePoints = function (map, params) {
                     }
                     liContent += '</li>';
                     uploads_list.prepend(liContent);
+                    /*
+                    $("#li_" + m._photo_id).hover((function (map_, marker_, photo_) {
+                        return (function () {
+                            GS.showMarkerWindow(map_, marker_, photo_);
+                        });
+                    })(map, m, p), function () {
+                        map._infoWindow.close();
+                    });
+                    */
                 }
             }
         }
@@ -272,5 +281,4 @@ $(document).ready(function () {
         $(this).addClass('selected_mode');
 
     });
-
 });
