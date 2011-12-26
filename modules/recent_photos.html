@@ -1,21 +1,24 @@
-<h2>Recent Uploads</h2>
 <div id="uploads">
+  <div id="uploads_h_container">
+    <h2>Recent Uploads</h2>
+  </div>
+  <div id="mode_container">
+    mode:
+    <span id="mode_recent" class="clickable map_mode {% if mode == 'recent' %} selected_mode{% end %}">recent</span> /
+    <span id="mode_nearby" class="clickable map_mode {% if mode == 'nearby' %} selected_mode{% end %}">nearby</span>
+  </div>
+  <div class="clearboth"></div>
+  {% if do_uploads %}
   <div id="uploads_box">
     <ul>
-      {% for photo in recent_photos %}
-      <li>
-        <a href="/photo/{{photo.encid}}" class="label"> &nbsp;&nbsp; <img src="/p/{{photo.encid}}.ts"> {{photo.time_ago}}</a> by
-        {% if photo.user is not None %}
-        <span class="user"><a href="/user/{{esc(photo.user.name)}}">{{photo.user.name}}</a></span>
-        {% else %}
-        Anonymous
-        {% end %}
-      </li>
-      {% end %}
     </ul>
   </div>
+  {% end %}
   {% if do_map %}
-  <div id="uploads_map"></div>
+  <div id="map_div" style="width: 500px; height: 400px;"></div>
   {% end %}
   <div class="clearboth"></div>
+  {% if debug %}
+  <div id="time_elapsed"></div>
+  {% end %}
 </div>

@@ -11,21 +11,6 @@
 {% block extra_js %}
 <script type="text/javascript" src="//maps.googleapis.com/maps/api/js?key={{gmaps_api_key}}&sensor=true"></script>
 <script type="text/javascript" src="{{static_url('js/home.js')}}"></script>
-<script type="text/javascript">
-{% if not mobile and latlng %}
-var markers = [
-{% for l in latlng %}
-  new google.maps.LatLng({{l['lat']}}, {{l['lng']}}),
-{% end %}
-];
-var bounds = new google.maps.LatLngBounds(
-  new google.maps.LatLng({{sw_point['lat']}}, {{sw_point['lng']}}),
-  new google.maps.LatLng({{ne_point['lat']}}, {{ne_point['lng']}}));
-{% else %}
-var markers = null;
-{% end %}
-</script>
-
 {% end %}
 
 {% block head_text %}
@@ -43,9 +28,9 @@ Welcome, <span class="user">{{ user.name }}</span>. Perhaps you'd like to upload
 
 {% if mobile %}
   {% raw modules.PhotoUpload() %}
-  {% raw modules.RecentPhotos(recent_photos, esc, False) %}
+  {% raw modules.RecentPhotos(map_mode, debug, esc, True, False) %}
 {% else %}
-  {% raw modules.RecentPhotos(recent_photos, esc, True) %}
+  {% raw modules.RecentPhotos(map_mode, debug, esc, True, True) %}
   {% raw modules.PhotoUpload() %}
   {% raw modules.About() %}
 {% end %}

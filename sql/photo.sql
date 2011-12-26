@@ -5,6 +5,7 @@ CREATE TABLE photo (
   fsid CHAR(32) NOT NULL,
   latitude FLOAT,
   longitude FLOAT,
+  geohash CHAR(12),
   make VARCHAR(128),
   model VARCHAR(128),
   photo_height INTEGER NOT NULL,
@@ -14,5 +15,7 @@ CREATE TABLE photo (
   sensor BOOLEAN,
   time_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   user_id INTEGER,
+  KEY (time_created),
+  KEY (geohash, time_created),
   PRIMARY KEY (id)
 ) Engine=InnoDB;

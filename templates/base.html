@@ -10,7 +10,12 @@
       {% block mobile_css %}{% end %}
     {% end %}
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="{{static_url('js/jquery.cookie.js')}}"></script>
     <script src="{{static_url('js/base.js')}}"></script>
+    <script type="text/javascript">
+      var debug = {{ 'true' if debug else 'false' }};
+      var mobile = {{ 'true' if mobile else 'false' }};
+    </script>
     {% block extra_js %}{% end %}
     <link rel="icon" type="image/png" href="{{static_url('favicon.png')}}">
     <title>Graff Spotting</title>

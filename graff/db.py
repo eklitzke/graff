@@ -1,7 +1,6 @@
 import datetime
 import hashlib
 import os
-import re
 from sqlalchemy import create_engine, func, Column, ForeignKey
 from sqlalchemy.types import Integer, String, Float, DateTime, Boolean
 from sqlalchemy.orm import sessionmaker, relationship, backref
@@ -10,6 +9,7 @@ import warnings
 
 from graff import config
 from graff import crypto
+from graff import geo
 
 if config.get('memory', True):
     engine = create_engine('sqlite:///:memory:')
@@ -57,6 +57,8 @@ class _Base(object):
 
 Base = declarative_base(cls=_Base)
 
+GEOHASH_PRECISION = 12 
+
 class Photo(Base):
     __tablename__ = 'photo'
 
@@ -66,6 +68,7 @@ class Photo(Base):
     fsid = Column(String(32), nullable=False)
     latitude = Column(Float)
     longitude = Column(Float)
+    geohash = Column(String(GEOHASH_PRECISION))
     make = Column(String(128))
     model = Column(String(128))
     photo_time = Column(DateTime, nullable=False, default=now)
@@ -95,6 +98,30 @@ class Photo(Base):
             return '1 day ago'
         else:
             return '%d days ago' % (int(delta.total_seconds() / 84600.0),)
+
+    @classmethod
+    def get_nearby(cls, session, limit=None, user=None, bounds=None):
+        """Get all of the photos in an area (possibly unbounded). Results are
+        returned in descending order of age (i.e. newest photos first).
+        """
+        assert limit is not None
+        q = session.query(cls)
+        if bounds:
+            hashcode = geo.get_bounding_geohash(bounds['n'], bounds['w'], bounds['s'], bounds['e'])
+            q.filter(cls.geohash.like(hashcode + '%')).filter(cls.latitude <= bounds['n']).filter(cls.latitude >= bounds['s']).filter(cls.longitude >= bounds['w']).filter(cls.longitude <= bounds['e'])
+        if user:
+            u = User.by_name(session, user)
+            q.filter(cls.user_id == u.id)
+        return q.order_by(cls.time_created.desc()).limit(limit)
+
+    def to_json(self):
+        return {
+            'id': self.encid,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'time_created': int(self.time_created.strftime('%s')),
+            'user': self.user.name if self.user_id else None
+            }
 
 class User(Base):
     __tablename__ = 'user'

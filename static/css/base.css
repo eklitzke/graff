@@ -10,6 +10,7 @@ h1 { font-size: 28px; font-weight: 900; color: #86FFB9; margin-bottom: 0.5em; }
 h2 { font-size: 20px; font-weight: 900; color: #86EAFF; margin-top: 1em; }
 em { font-weight: 900; font-style: italic; }
 p { margin-top: 0.6em; }
+.clickable { cursor: pointer; }
 .graff_img { cursor: pointer; }
 .red { color: #FB3F31 !important; }
 .user { color: /*#ebc8ff*/ #FFB2A8 !important; font-weight: bold; text-decoration: none; }

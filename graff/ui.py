@@ -17,8 +17,14 @@ class PhotoUploadModule(UIModule):
 
 class RecentPhotosModule(UIModule):
 
-    def render(self, recent_photos, esc, do_map):
-        return self.render_string('recent_photos.html', recent_photos=recent_photos, esc=esc, do_map=do_map)
+    def javascript_files(self):
+        return ['js/maps.js']
+
+    def css_files(self):
+        return ['css/maps.css']
+
+    def render(self, mode, debug, esc, do_uploads, do_map):
+        return self.render_string('recent_photos.html', mode=mode, debug=debug, esc=esc, do_uploads=do_uploads, do_map=do_map)
 
 class AboutModule(UIModule):
 

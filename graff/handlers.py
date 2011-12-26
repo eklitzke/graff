@@ -7,6 +7,8 @@ import re
 import struct
 import time
 import traceback
+
+import geohash
 import PIL.Image
 from PIL.ExifTags import GPSTAGS, TAGS
 from tornado.escape import url_escape, url_unescape
@@ -161,17 +163,6 @@ class RequestHandler(tornado.web.RequestHandler):
     def render(self, name):
         return super(RequestHandler, self).render(name, **self.env)
 
-class DebugHandler(RequestHandler):
-
-    path = '/debug'
-
-    def get(self):
-        try:
-            import ipdb as pdb
-        except ImportError:
-            import pdb
-        pdb.set_trace()
-
 class NotFoundHandler(RequestHandler):
     """Generates an error response with status_code for all requests."""
 
@@ -184,16 +175,12 @@ class HomeHandler(RequestHandler):
 
     def get(self):
         self.env['recent_photos'] = list(db.Photo.most_recent(self.session, 20))
-        v = lambda x: x is not None
-        self.env['latlng'] = [{'lat': p.latitude, 'lng': p.longitude} for p in self.env['recent_photos'] if v(p.latitude) and v(p.longitude)]
-        if self.env['latlng']:
-            minlat = min(x['lat'] for x in self.env['latlng'])
-            maxlat = max(x['lat'] for x in self.env['latlng'])
-            minlng = min(x['lng'] for x in self.env['latlng'])
-            maxlng = max(x['lng'] for x in self.env['latlng'])
-            self.env['sw_point'] = {'lat': minlat, 'lng': minlng}
-            self.env['ne_point'] = {'lat': maxlat, 'lng': maxlng}
+        if int(self.get_cookie('mm', 0)) == 0:
+            self.env['map_mode'] = 'recent'
+        else:
+            self.env['map_mode'] = 'nearby'
         self.render('home.html')
+
 
 NAME_RE = re.compile(r'[#-_~a-zA-Z0-9@!\$&\*\\/^:=\'"]*$')
 class SignupHandler(RequestHandler):
@@ -315,7 +302,7 @@ class UploadHandler(RequestHandler):
         lng = self.decode_gps_ref(gpsinfo['GPSLongitude'])
         if gpsinfo['GPSLongitudeRef'] == 'W':
             lng *= -1
-        return lat, lng
+        return lat, lng, geohash.encode(lat, lng, precision=db.GEOHASH_PRECISION)
 
     def save_versions(self, img, imgtype, outpath):
 
@@ -370,6 +357,12 @@ class UploadHandler(RequestHandler):
         body_hash = hashlib.sha1(img_fields['body']).hexdigest()
         img_file = StringIO.StringIO(img_fields['body'])
         content_type = img_fields['content_type'].lower()
+        if content_type == 'application/octet-stream':
+            name = img_fields.get('filename', '').lower()
+            if name.endswith('.jpg'):
+                content_type = 'image/jpeg'
+            elif name.endswith('.png'):
+                content_type = 'image/png'
         img = PIL.Image.open(img_file)
 
         do_exif = True
@@ -402,10 +395,10 @@ class UploadHandler(RequestHandler):
                 elif orientation == 8:
                     img = img.transpose(PIL.Image.ROTATE_90)
             if 'GPSInfo' in info:
-                lat, lng = self.decode_gps(info['GPSInfo'])
+                lat, lng, geohash = self.decode_gps(info['GPSInfo'])
                 sensor = True
             else:
-                lat, lng = None, None
+                lat, lng, geohash = None, None, None
                 sensor = None
             dt = info.get('DateTime')
             if dt is not None:
@@ -435,6 +428,7 @@ class UploadHandler(RequestHandler):
             fsid = fsid,
             latitude = lat,
             longitude = lng,
+            geohash = geohash,
             make = make,
             model = model,
             photo_time = dt,
@@ -486,10 +480,8 @@ class PhotoHandler(RequestHandler):
         try:
             photo = db.Photo.from_encid(self.session, encid)
         except crypto.InvalidEncryptedId:
-            import ipdb; ipdb.set_trace()
             raise tornado.web.HTTPError(404)
         if photo is None:
-            import ipdb; ipdb.set_trace()
             raise tornado.web.HTTPError(404)
         self.set_header('Content-Type', photo.content_type)
 
@@ -519,6 +511,29 @@ class UserHandler(RequestHandler):
         self.env['target_user'] = target_user
         self.render('user.html')
 
+class PhotosNearbyHandler(RequestHandler):
+
+    path = '/photos'
+
+    def get(self):
+        start = time.time()
+        n = self.get_argument('n', None)
+        s = self.get_argument('s', None)
+        e = self.get_argument('e', None)
+        w = self.get_argument('w', None)
+        user = self.get_argument('user', None)
+        limit = min(int(self.get_argument('count', 20)), 60)
+        if n is not None and s is not None and e is not None and w is not None:
+            bounds = {
+                'n': float(n),
+                's': float(s),
+                'e': float(e),
+                'w': float(w) }
+        else:
+            bounds = None
+            
+        photos = [p.to_json() for p in db.Photo.get_nearby(self.session, limit=limit, user=user, bounds=bounds)]
+        self.write({'photos': photos, 'time_ms': 1000 * (time.time() - start)})
 
 handlers = []
 for v in globals().values():
